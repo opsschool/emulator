@@ -1,0 +1,13 @@
+[Unit]
+Description=Payments gateway (sandbox)
+After=network-online.target
+
+[Service]
+User=shop
+Group=shop
+ExecStart=/opt/shop/current/shop payments --listen 127.0.0.1:8081
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

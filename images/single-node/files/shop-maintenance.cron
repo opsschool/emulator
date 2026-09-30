@@ -1,0 +1,3 @@
+# Nightly report and session cleanup. Runs hourly so reports stay fresh.
+SHELL=/bin/bash
+17 * * * * shop set -a; source /etc/shop/shop.env; set +a; /opt/shop/current/shop maintenance >/dev/null 2>&1

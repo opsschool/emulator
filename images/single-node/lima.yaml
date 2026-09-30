@@ -1,0 +1,38 @@
+# Lima template for the single-node scenario VM. Built once by
+# `images/single-node/build.sh`; each session starts from a clone.
+minimumLimaVersion: "1.1.0"
+vmType: null # qemu on Linux, vz on macOS
+images:
+  - location: "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2"
+    arch: "x86_64"
+  - location: "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-arm64.qcow2"
+    arch: "aarch64"
+cpus: 2
+memory: "4GiB"
+disk: "20GiB"
+# No host mounts: learners have root in the VM.
+mounts: []
+containerd:
+  system: false
+  user: false
+ssh:
+  forwardAgent: false
+# The management channel: Lima's default interface (eth0) and these
+# forwards. Break scripts must not touch them.
+portForwards:
+  - guestPort: 80
+    hostPort: 18080
+  - guestPort: 9091 # shop admin: /metrics, pprof
+    hostPort: 19091
+  - guestPort: 9092 # shop worker admin
+    hostPort: 19092
+  - guestPort: 9100 # node_exporter
+    hostPort: 19100
+  - guestPort: 9256 # process-exporter
+    hostPort: 19256
+  - guestPort: 9104 # mysqld_exporter
+    hostPort: 19104
+  - guestPort: 9121 # redis_exporter
+    hostPort: 19121
+  - guestPortRange: [1, 65535]
+    ignore: true

@@ -1,0 +1,12 @@
+[Unit]
+Description=Prometheus @NAME@
+After=network-online.target
+
+[Service]
+User=@USER@
+ExecStart=@EXEC@
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

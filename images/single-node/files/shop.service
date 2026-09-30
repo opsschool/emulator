@@ -1,0 +1,16 @@
+[Unit]
+Description=Shop API
+After=network-online.target mysql.service redis-server.service shop-payments.service
+Wants=network-online.target
+
+[Service]
+User=shop
+Group=shop
+EnvironmentFile=/etc/shop/shop.env
+ExecStart=/opt/shop/current/shop serve
+Restart=always
+RestartSec=2
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

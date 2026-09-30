@@ -1,0 +1,15 @@
+[Unit]
+Description=Shop order worker
+After=network-online.target mysql.service
+Wants=network-online.target
+
+[Service]
+User=shop
+Group=shop
+EnvironmentFile=/etc/shop/shop.env
+ExecStart=/opt/shop/current/shop worker
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

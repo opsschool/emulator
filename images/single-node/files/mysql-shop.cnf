@@ -1,0 +1,11 @@
+[mysqld]
+datadir = /data/mysql
+# Diagnostics learners are expected to use.
+performance_schema = ON
+slow_query_log = ON
+slow_query_log_file = /data/mysql/slow.log
+long_query_time = 0.5
+log_error = /var/log/mysql/error.log
+# Sized for a 4 GiB VM.
+innodb_buffer_pool_size = 1G
+max_connections = 151
