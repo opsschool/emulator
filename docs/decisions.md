@@ -19,7 +19,9 @@ machine as a privileged systemd container built from
   directly; Loki gets the alias `telemetry.opsschool.internal`, which Alloy
   pushes to. In the VM that name points at the host (192.168.5.2).
 
-Lima stays the default whenever `limactl` is installed.
+Lima stays the default whenever `limactl` is installed. The project owner
+approved Ubuntu for the container image and the checkout-session change
+that makes a full disk fail orders promptly.
 
 ## 2026-09-30: Sessions clone a stopped base machine
 
@@ -146,5 +148,5 @@ it knows the answer. Now:
 
 ## 2026-09-30: License
 
-Apache 2.0 for the code. The curriculum uses CC BY 3.0, which suits prose but
-not software. Confirm with the project owner.
+Apache 2.0 for the code, confirmed by the project owner. The curriculum
+uses CC BY 3.0, which suits prose but not software.
