@@ -49,7 +49,9 @@ scenario machine as a privileged systemd container; see
 ## Status
 
 Milestones M0 to M3 from [docs/design.md](docs/design.md) are built, with
-one scenario (`linux-disk-full`). The Lima path has not been run yet.
+one scenario (`linux-disk-full`). It has been played start to finish and
+passes `opsschool test` with the container driver. The Lima path (VM image
+and driver) is written but has not been run yet.
 
 ## Writing scenarios
 

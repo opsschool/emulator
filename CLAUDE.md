@@ -10,6 +10,11 @@ doesn't cover.
 
 - `make check`: gofmt, vet, tests, shellcheck and `opsschool validate` on all scenarios. Run before every push.
 - `go run ./cmd/opsschool validate scenarios`: lint scenarios only.
+- `opsschool image build single-node --driver container`, then
+  `opsschool test scenarios/<category>/<id> --driver container`: verify a
+  scenario end to end without Lima. Needs Docker and about 10 GB of disk.
+- `SHOP_TEST_DSN=... go test ./demoapp/...`: store integration tests
+  against a disposable MySQL.
 
 ## Conventions
 

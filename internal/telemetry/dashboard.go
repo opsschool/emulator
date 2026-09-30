@@ -76,11 +76,15 @@ func stat(title, expr, unit string, mappings []any, thresholds []any) Panel {
 		defaults["thresholds"] = map[string]any{"mode": "absolute", "steps": thresholds}
 		defaults["color"] = map[string]any{"mode": "thresholds"}
 	}
+	colorMode := "none" // plain numbers; Grafana's default thresholds turn them red
+	if thresholds != nil {
+		colorMode = "background"
+	}
 	return Panel{
 		"type": "stat", "title": title, "datasource": promDS,
 		"targets":     []map[string]any{{"refId": "A", "expr": expr, "datasource": promDS, "instant": true}},
 		"fieldConfig": map[string]any{"defaults": defaults, "overrides": []any{}},
-		"options":     map[string]any{"colorMode": "background", "graphMode": "none", "reduceOptions": map[string]any{"calcs": []string{"lastNotNull"}}},
+		"options":     map[string]any{"colorMode": colorMode, "graphMode": "none", "reduceOptions": map[string]any{"calcs": []string{"lastNotNull"}}},
 	}
 }
 
