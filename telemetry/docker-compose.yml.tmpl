@@ -1,0 +1,49 @@
+# Rendered by the opsschool CLI into the session directory. Do not edit the
+# rendered copy; edit telemetry/docker-compose.yml.tmpl.
+name: opsschool
+services:
+  prometheus:
+    image: prom/prometheus:v{{.Versions.Prometheus}}
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=2d
+      - --web.listen-address={{.Listen "prometheus"}}
+      - --web.enable-lifecycle
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+{{- template "net" (.Net "prometheus")}}
+  loki:
+    image: grafana/loki:{{.Versions.Loki}}
+    command:
+      - -config.file=/etc/loki/loki.yaml
+      - -server.http-listen-address={{.ListenHost}}
+      - -server.http-listen-port={{.Ports.Loki}}
+    volumes:
+      - ./loki.yaml:/etc/loki/loki.yaml:ro
+{{- template "net" (.Net "loki")}}
+  grafana:
+    image: grafana/grafana:{{.Versions.Grafana}}
+    environment:
+      GF_SERVER_HTTP_ADDR: "{{.ListenHost}}"
+      GF_SERVER_HTTP_PORT: "{{.Ports.Grafana}}"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/scenario.json
+      GF_DASHBOARDS_MIN_REFRESH_INTERVAL: 5s
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+{{- template "net" (.Net "grafana")}}
+{{- define "net"}}
+{{- if .HostNetwork}}
+    network_mode: host
+{{- else}}
+    ports:
+      - "127.0.0.1:{{.HostPort}}:{{.ContainerPort}}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+{{- end}}
+{{- end}}

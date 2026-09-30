@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: opsschool
+    type: file
+    updateIntervalSeconds: 5
+    options:
+      path: /var/lib/grafana/dashboards

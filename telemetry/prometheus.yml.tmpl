@@ -1,0 +1,14 @@
+# Rendered by the opsschool CLI. Scrapes the scenario VM's forwarded ports
+# and the CLI's own metrics every 5s.
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+{{- range .Targets}}
+  - job_name: {{.Job}}
+    static_configs:
+      - targets: ["{{$.TargetHost}}:{{.Port}}"]
+        labels:
+          instance: {{.Instance}}
+{{- end}}
