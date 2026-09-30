@@ -1,0 +1,52 @@
+name: Scenarios
+
+# Full end-to-end verification (opsschool test) for every scenario a pull
+# request changes, and for all scenarios when the image, the demo app or
+# the harness changes. Uses the container driver: see docs/decisions.md.
+
+on:
+  pull_request:
+    paths:
+      - "scenarios/**"
+      - "images/**"
+      - "demoapp/**"
+      - "internal/**"
+      - "telemetry/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Pick scenarios
+        id: pick
+        run: |
+          base=${{ github.event.pull_request.base.sha || 'HEAD~1' }}
+          changed=$(git diff --name-only "$base" HEAD)
+          if echo "$changed" | grep -qvE '^scenarios/'; then
+            dirs=$(find scenarios -name scenario.yaml -exec dirname {} \; | sort)
+          else
+            dirs=$(echo "$changed" | grep -E '^scenarios/[^/]+/[^/]+/' | cut -d/ -f1-3 | sort -u)
+          fi
+          echo "dirs=$(echo $dirs)" >>"$GITHUB_OUTPUT"
+          echo "Scenarios: $dirs"
+      - name: Build opsschool
+        run: go build -o bin/opsschool ./cmd/opsschool
+      - name: Build the base image
+        run: bin/opsschool image build single-node --driver container
+      - name: Verify scenarios
+        run: |
+          for d in ${{ steps.pick.outputs.dirs }}; do
+            [ -f "$d/scenario.yaml" ] || continue
+            bin/opsschool test "$d" --driver container
+          done

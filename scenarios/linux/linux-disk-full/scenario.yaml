@@ -10,8 +10,6 @@ summary: >
 randomize:
   log_name:
     choices: [debug.log, trace.log, app-verbose.log]
-  headroom_mb:
-    range: [0, 5]
 fix_verification:
   restart: [shop.service]
   reboot: false

@@ -56,6 +56,24 @@ func TestDashboard(t *testing.T) {
 }
 
 func TestRender(t *testing.T) {
+	nd := t.TempDir()
+	ns := &Stack{Dir: nd}
+	ns.UseNetwork("opsschool", "172.30.0.1")
+	if err := ns.Render([]byte(`{}`)); err != nil {
+		t.Fatal(err)
+	}
+	c, _ := os.ReadFile(filepath.Join(nd, "docker-compose.yml"))
+	p, _ := os.ReadFile(filepath.Join(nd, "prometheus.yml"))
+	for _, want := range []string{"external: true", "aliases: [telemetry.opsschool.internal]"} {
+		if !strings.Contains(string(c), want) {
+			t.Errorf("network compose missing %q:\n%s", want, c)
+		}
+	}
+	for _, want := range []string{"scenario-vm:9100", "172.30.0.1:19999"} {
+		if !strings.Contains(string(p), want) {
+			t.Errorf("network prometheus.yml missing %q:\n%s", want, p)
+		}
+	}
 	for _, host := range []bool{true, false} {
 		dir := t.TempDir()
 		s := &Stack{Dir: dir, HostNetwork: host}

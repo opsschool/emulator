@@ -66,3 +66,22 @@ func TestUnknownCommand(t *testing.T) {
 		t.Fatalf("exit %d: %s", code, errb)
 	}
 }
+
+func TestSplitFirst(t *testing.T) {
+	cases := []struct {
+		in   []string
+		id   string
+		rest string
+	}{
+		{[]string{"linux-disk-full", "--user", "jo"}, "linux-disk-full", "--user jo"},
+		{[]string{"--user", "jo", "linux-disk-full"}, "linux-disk-full", "--user jo"},
+		{[]string{"--user=jo", "linux-disk-full", "--seed", "3"}, "linux-disk-full", "--user=jo --seed 3"},
+		{[]string{"--user", "jo"}, "", "--user jo"},
+	}
+	for _, c := range cases {
+		id, rest := splitFirst(c.in)
+		if id != c.id || strings.Join(rest, " ") != c.rest {
+			t.Errorf("splitFirst(%q) = %q, %q", c.in, id, rest)
+		}
+	}
+}

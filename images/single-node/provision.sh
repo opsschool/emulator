@@ -2,6 +2,10 @@
 # Provisions the single-node scenario VM. Runs once, as root, inside the VM
 # when the image is built. $1 is the build directory copied in by build.sh:
 # it holds this script, files/, versions.env and the shop binaries.
+#
+# OPSSCHOOL_PROVISION=container adapts it for the container driver: MySQL
+# comes from the distribution and the exporters and Alloy are already in
+# the image.
 set -euo pipefail
 
 build=${1:?usage: provision.sh <build-dir>}
@@ -11,6 +15,7 @@ source "$build/versions.env"
 arch=$(dpkg --print-architecture) # amd64 or arm64
 codename=$(. /etc/os-release && echo "$VERSION_CODENAME")
 export DEBIAN_FRONTEND=noninteractive
+mode=${OPSSCHOOL_PROVISION:-vm}
 
 log() { echo "==> $*"; }
 
@@ -21,10 +26,19 @@ install_packages() {
     ca-certificates curl gnupg unzip jq \
     nginx redis-server cron logrotate \
     strace lsof sysstat tcpdump dnsutils iproute2 iptables htop procps psmisc \
-    net-tools ncat less vim-tiny bpftrace linux-perf
+    net-tools ncat less vim-tiny
+  # Tracing tools vary by distribution; install what exists.
+  for pkg in bpftrace linux-perf; do
+    apt-get install -y -q --no-install-recommends "$pkg" || echo "skipping $pkg"
+  done
 }
 
 install_mysql() {
+  if [[ $mode == container ]]; then
+    log "mysql (distribution package)"
+    apt-get install -y -q mysql-server
+    return
+  fi
   log "mysql ($MYSQL_SERIES)"
   curl -fsSL https://repo.mysql.com/RPM-GPG-KEY-mysql-2023 | gpg --dearmor -o /usr/share/keyrings/mysql.gpg
   echo "deb [signed-by=/usr/share/keyrings/mysql.gpg] http://repo.mysql.com/apt/debian $codename $MYSQL_SERIES" \
@@ -124,6 +138,9 @@ install_exporters() {
   log "exporters"
   id exporter >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin exporter
   local gh=https://github.com
+  if [[ $mode == container ]]; then
+    fetch_tarball() { :; } # binaries are in the image
+  fi
   fetch_tarball "$gh/prometheus/node_exporter/releases/download/v$NODE_EXPORTER_VERSION/node_exporter-$NODE_EXPORTER_VERSION.linux-$arch.tar.gz" \
     node_exporter /usr/local/bin/node_exporter
   fetch_tarball "$gh/ncabatoff/process-exporter/releases/download/v$PROCESS_EXPORTER_VERSION/process-exporter-$PROCESS_EXPORTER_VERSION.linux-$arch.tar.gz" \
@@ -150,12 +167,14 @@ EOF
 
 install_alloy() {
   log "grafana alloy $ALLOY_VERSION"
-  local tmp
-  tmp=$(mktemp -d)
-  curl -fsSL -o "$tmp/alloy.zip" "https://github.com/grafana/alloy/releases/download/v$ALLOY_VERSION/alloy-linux-$arch.zip"
-  unzip -q -o "$tmp/alloy.zip" -d "$tmp"
-  install -m 0755 "$tmp/alloy-linux-$arch" /usr/local/bin/alloy
-  rm -rf "$tmp"
+  if [[ $mode != container ]]; then
+    local tmp
+    tmp=$(mktemp -d)
+    curl -fsSL -o "$tmp/alloy.zip" "https://github.com/grafana/alloy/releases/download/v$ALLOY_VERSION/alloy-linux-$arch.zip"
+    unzip -q -o "$tmp/alloy.zip" -d "$tmp"
+    install -m 0755 "$tmp/alloy-linux-$arch" /usr/local/bin/alloy
+    rm -rf "$tmp"
+  fi
   install -d /etc/alloy /var/lib/alloy
   install -m 0644 "$files/alloy.config" /etc/alloy/config.alloy
   cat >/etc/systemd/system/alloy.service <<'EOF'
@@ -181,6 +200,11 @@ install_harness() {
 enable_services() {
   log "services"
   sed -i 's/^ENABLED=.*/ENABLED="true"/' /etc/default/sysstat
+  # Alloy pushes logs to telemetry.opsschool.internal. In the VM that is the
+  # host; the container driver points it at the Loki container instead.
+  if [[ $mode != container ]] && ! grep -q telemetry.opsschool.internal /etc/hosts; then
+    echo "192.168.5.2 telemetry.opsschool.internal" >>/etc/hosts
+  fi
   systemctl daemon-reload
   systemctl enable --now redis-server mysql cron sysstat \
     shop-payments shop shop-worker nginx \

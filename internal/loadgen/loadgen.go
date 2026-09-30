@@ -116,7 +116,6 @@ type Stats struct {
 // Generator sends traffic to a shop.
 type Generator struct {
 	BaseURL   string
-	Profile   Profile
 	Client    *http.Client
 	Stats     Stats
 	Products  int // catalog size to draw product IDs from
@@ -127,6 +126,21 @@ type Generator struct {
 
 	mu          sync.Mutex
 	recentOrder []int64
+	Profile     Profile // guarded by mu after Run starts; use SetProfile
+}
+
+// SetProfile changes the rate profile of a running generator.
+func (g *Generator) SetProfile(p Profile) {
+	g.mu.Lock()
+	g.Profile = p
+	g.mu.Unlock()
+}
+
+// CurrentProfile returns the active profile.
+func (g *Generator) CurrentProfile() Profile {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.Profile
 }
 
 // New returns a generator with sensible defaults for the seeded shop.
@@ -149,7 +163,7 @@ func (g *Generator) Run(ctx context.Context) {
 	var wg sync.WaitGroup
 	defer wg.Wait()
 	for {
-		rate := g.Profile.RateAt(time.Since(start))
+		rate := g.CurrentProfile().RateAt(time.Since(start))
 		wait := time.Second
 		if rate > 0 {
 			wait = time.Duration(rand.ExpFloat64() / rate * float64(time.Second))

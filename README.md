@@ -19,28 +19,41 @@ notification as you pass each tier:
 Scenarios range from L1 (one obvious fault) to L4 (several interacting
 faults). Juniors aim to mitigate L1–L2 scenarios; seniors fix L3–L4 ones.
 
-## Status
+## Getting started
 
-Under construction. See the milestones in [docs/design.md](docs/design.md).
-
-| Command | Status |
-| --- | --- |
-| `opsschool list` | works |
-| `opsschool validate <path>` | works |
-| everything else | in progress |
-
-## Building
-
-Requires Go (the version in `go.mod`; `GOTOOLCHAIN=auto` fetches it).
+You need Go (the version in `go.mod`; `GOTOOLCHAIN=auto` fetches it),
+Docker with Compose (for the dashboards), and [Lima](https://lima-vm.io) 1.1
+or later for the scenario VM.
 
 ```
 go build -o bin/opsschool ./cmd/opsschool
+bin/opsschool image build single-node        # once, 10-20 minutes
 bin/opsschool list
+bin/opsschool start linux-disk-full --user jdoe
+bin/opsschool shell                          # debug as root in the VM
+bin/opsschool status                         # tiers, time, hints
+bin/opsschool hint                           # -10 points each
+bin/opsschool verify                         # claim a fix
+bin/opsschool quiz                           # optional, not scored
+bin/opsschool stop                           # record the result, tear down
 ```
+
+Dashboards are at http://127.0.0.1:13000 and results go to
+`~/.opsschool/results.jsonl`.
+
+Without Lima (for example in CI or a VM without nested virtualization),
+pass `--driver container` to `image build`, `start` and `test`. It runs the
+scenario machine as a privileged systemd container; see
+[docs/decisions.md](docs/decisions.md) for how it differs.
+
+## Status
+
+Milestones M0 to M3 from [docs/design.md](docs/design.md) are built, with
+one scenario (`linux-disk-full`). The Lima path has not been run yet.
 
 ## Writing scenarios
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+See [docs/writing-scenarios.md](docs/writing-scenarios.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

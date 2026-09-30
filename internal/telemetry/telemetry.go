@@ -35,22 +35,24 @@ var Versions = struct{ Prometheus, Loki, Grafana string }{
 	Grafana:    "13.2.3",
 }
 
-// Target is one Prometheus scrape job.
+// Target is one Prometheus scrape job on the scenario machine. HostPort is
+// where Lima forwards VMPort on the host.
 type Target struct {
-	Job, Instance string
-	Port          int
+	Job              string
+	VMPort, HostPort int
 }
 
 // Targets are the scrape jobs for a single-node scenario.
 var Targets = []Target{
-	{"shop", "scenario-vm", 19091},
-	{"shop-worker", "scenario-vm", 19092},
-	{"node", "scenario-vm", 19100},
-	{"process", "scenario-vm", 19256},
-	{"mysql", "scenario-vm", 19104},
-	{"redis", "scenario-vm", 19121},
-	{"opsschool", "host", CLIMetricsPort},
+	{"shop", 9091, 19091},
+	{"shop-worker", 9092, 19092},
+	{"node", 9100, 19100},
+	{"process", 9256, 19256},
+	{"mysql", 9104, 19104},
+	{"redis", 9121, 19121},
 }
+
+type renderedTarget struct{ Job, Instance, Addr string }
 
 // Stack is a rendered telemetry stack in a directory.
 type Stack struct {
@@ -59,6 +61,16 @@ type Stack struct {
 	// where containers can't reach ports Lima forwards to 127.0.0.1. Docker
 	// Desktop (macOS, Windows) reaches them through host.docker.internal.
 	HostNetwork bool
+	// Network, when set, is an existing Docker network the stack joins to
+	// reach the machine directly (the container driver). CLIHost is the
+	// host's address on that network, where the CLI serves its metrics.
+	Network string
+	CLIHost string
+}
+
+// UseNetwork makes the stack reach the machine over a Docker network.
+func (s *Stack) UseNetwork(network, cliHost string) {
+	s.Network, s.CLIHost, s.HostNetwork = network, cliHost, false
 }
 
 // NewStack returns a stack for this platform.
@@ -71,14 +83,14 @@ func GrafanaURL() string    { return fmt.Sprintf("http://127.0.0.1:%d", GrafanaP
 type netSettings struct {
 	HostNetwork             bool
 	HostPort, ContainerPort int
+	Network, Alias          string
 }
 
 type renderData struct {
 	*Stack
 	Versions      struct{ Prometheus, Loki, Grafana string }
 	Ports         struct{ Prometheus, Loki, Grafana int }
-	Targets       []Target
-	TargetHost    string
+	Targets       []renderedTarget
 	ListenHost    string
 	PrometheusURL string
 	LokiURL       string
@@ -87,7 +99,11 @@ type renderData struct {
 func (d renderData) Net(service string) netSettings {
 	port := map[string]int{"prometheus": PrometheusPort, "loki": LokiPort, "grafana": GrafanaPort}[service]
 	container := map[string]int{"prometheus": 9090, "loki": LokiPort, "grafana": GrafanaPort}[service]
-	return netSettings{HostNetwork: d.HostNetwork, HostPort: port, ContainerPort: container}
+	n := netSettings{HostNetwork: d.HostNetwork, HostPort: port, ContainerPort: container, Network: d.Network}
+	if service == "loki" {
+		n.Alias = "telemetry.opsschool.internal"
+	}
+	return n
 }
 
 func (d renderData) Listen(service string) string {
@@ -98,17 +114,30 @@ func (d renderData) Listen(service string) string {
 }
 
 func (s *Stack) data() renderData {
-	d := renderData{Stack: s, Versions: Versions, Targets: Targets}
+	d := renderData{Stack: s, Versions: Versions}
 	d.Ports.Prometheus, d.Ports.Loki, d.Ports.Grafana = PrometheusPort, LokiPort, GrafanaPort
+	host, cli := "host.docker.internal", "host.docker.internal"
 	if s.HostNetwork {
-		d.TargetHost, d.ListenHost = "127.0.0.1", "127.0.0.1"
+		host, cli = "127.0.0.1", "127.0.0.1"
+		d.ListenHost = "127.0.0.1"
 		d.PrometheusURL = PrometheusURL()
 		d.LokiURL = fmt.Sprintf("http://127.0.0.1:%d", LokiPort)
 	} else {
-		d.TargetHost, d.ListenHost = "host.docker.internal", "0.0.0.0"
+		d.ListenHost = "0.0.0.0"
 		d.PrometheusURL = "http://prometheus:9090"
 		d.LokiURL = fmt.Sprintf("http://loki:%d", LokiPort)
 	}
+	if s.Network != "" {
+		cli = s.CLIHost
+	}
+	for _, t := range Targets {
+		addr := fmt.Sprintf("%s:%d", host, t.HostPort)
+		if s.Network != "" {
+			addr = fmt.Sprintf("scenario-vm:%d", t.VMPort)
+		}
+		d.Targets = append(d.Targets, renderedTarget{t.Job, "scenario-vm", addr})
+	}
+	d.Targets = append(d.Targets, renderedTarget{"opsschool", "host", fmt.Sprintf("%s:%d", cli, CLIMetricsPort)})
 	return d
 }
 
@@ -170,7 +199,7 @@ func (s *Stack) Up(ctx context.Context) error {
 		fmt.Sprintf("http://127.0.0.1:%d/ready", LokiPort),
 		GrafanaURL() + "/api/health",
 	} {
-		if err := waitHTTP(ctx, u, 2*time.Minute); err != nil {
+		if err := WaitHTTP(ctx, u, 2*time.Minute); err != nil {
 			return err
 		}
 	}
@@ -182,7 +211,8 @@ func (s *Stack) Down(ctx context.Context) error {
 	return s.compose(ctx, "down", "-v", "--remove-orphans")
 }
 
-func waitHTTP(ctx context.Context, url string, timeout time.Duration) error {
+// WaitHTTP polls url until it answers 200 or the timeout passes.
+func WaitHTTP(ctx context.Context, url string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for {
 		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)

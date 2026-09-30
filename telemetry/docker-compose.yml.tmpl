@@ -46,4 +46,16 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 {{- end}}
+{{- if .Network}}
+    networks:
+      {{.Network}}:
+{{- if .Alias}}
+        aliases: [{{.Alias}}]
+{{- end}}
+{{- end}}
+{{- end}}
+{{- if .Network}}
+networks:
+  {{.Network}}:
+    external: true
 {{- end}}

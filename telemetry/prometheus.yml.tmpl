@@ -8,7 +8,7 @@ scrape_configs:
 {{- range .Targets}}
   - job_name: {{.Job}}
     static_configs:
-      - targets: ["{{$.TargetHost}}:{{.Port}}"]
+      - targets: ["{{.Addr}}"]
         labels:
           instance: {{.Instance}}
 {{- end}}

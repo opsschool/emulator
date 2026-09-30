@@ -55,6 +55,7 @@ const (
 )
 
 var (
+	boolModifier   = regexp.MustCompile(`(==|!=|<=|>=|<|>)\s*bool\b`)
 	idPattern      = regexp.MustCompile(`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
 	varNamePattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 )
@@ -216,6 +217,8 @@ func (v *validator) checks() {
 			case CheckPromQL:
 				if ch.Expr == "" {
 					v.errf(f, 0, "%s: promql check needs expr", where)
+				} else if boolModifier.MatchString(ch.Expr) {
+					v.errf(f, 0, "%s: promql checks pass on any result, so a `bool` comparison always passes; use a filter such as `x < 0.01`", where)
 				}
 			case CheckScript:
 				if ch.Run == "" {

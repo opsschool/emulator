@@ -3,6 +3,66 @@
 Changes to [design.md](design.md) and judgment calls made while building.
 Newest first.
 
+## 2026-09-30: Container driver for development and CI
+
+Lima needs hardware virtualization, which the environment this was built in
+lacks and CI runners may lack. `--driver container` runs the scenario
+machine as a privileged systemd container built from
+`images/single-node/container/Dockerfile` and the same `provision.sh`
+(`OPSSCHOOL_PROVISION=container`). Differences from the VM:
+
+- Ubuntu 24.04 and its MySQL 8.0 package instead of Debian 13 and MySQL
+  8.4, because the Debian and MySQL download hosts were unreachable here.
+- It shares the host kernel: no kernel tuning, and a reboot is a container
+  restart.
+- Telemetry joins a Docker network (`opsschool`) and scrapes the machine
+  directly; Loki gets the alias `telemetry.opsschool.internal`, which Alloy
+  pushes to. In the VM that name points at the host (192.168.5.2).
+
+Lima stays the default whenever `limactl` is installed.
+
+## 2026-09-30: Sessions clone a stopped base machine
+
+`opsschool image build <image>` provisions a base machine once (Lima
+instance `opsschool-<image>`, or Docker image `opsschool/<image>:base`).
+Each session starts from a clone, so `start` never reinstalls packages and
+every session begins clean. `limactl clone` needs Lima 1.1 or later.
+
+## 2026-09-30: A background daemon runs the session
+
+`opsschool start` sets up, breaks, then starts `opsschool _daemon`, which
+runs until `stop`. It drives load, grades `mitigated` every 5s, serves the
+CLI's metrics on 127.0.0.1:19999, and answers the other commands over a
+small HTTP API on the same port. State is in `~/.opsschool/session/`.
+
+## 2026-09-30: What "fixed" means
+
+`opsschool verify` restarts the listed units, reboots if required, replays
+peak load for `load_replay`, waits 15s, then passes `fixed` only if the
+fixed checks, the mitigated checks (without the hold) and the preserve
+checks all pass. A passing verify also marks `mitigated` as passed, since
+the service is healthy. A failed preserve check records data loss.
+
+## 2026-09-30: "Checks must fail" means the tier fails
+
+The spec says all `mitigated` and `fixed` checks must fail after the break.
+Some checks, such as a health endpoint, legitimately pass during an
+incident. `opsschool test` requires each tier to fail as a whole (at least
+one check failing), which is what grading depends on.
+
+## 2026-09-30: Payments by IP for now
+
+The shop calls its payments stand-in at `127.0.0.1:8081`. The `net-dns`
+scenario (M4) will need a hostname and a local resolver; that is left for
+when the scenario is written.
+
+## 2026-09-30: Download checksums
+
+The image pins exporter, Alloy and MySQL versions but does not verify
+checksums, because the release hosts were unreachable when this was
+written. Add SHA-256 checks to `provision.sh` when building with network
+access.
+
 ## 2026-09-30: Go 1.27
 
 `go.mod` pins Go 1.27 with toolchain 1.27.1, the current release.

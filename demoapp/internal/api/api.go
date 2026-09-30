@@ -184,6 +184,12 @@ func (s *Server) createOrder(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	// Authorize an estimate first; the real total is computed from the
 	// catalog price inside the order transaction.
+	// Checkout keeps its state in a session file, as many web frameworks
+	// do. Without it the order can't complete.
+	if err := s.writeSession(req); err != nil {
+		s.fail(w, r, fmt.Errorf("checkout session: %w", err))
+		return
+	}
 	ref, err := s.Payments.Authorize(ctx, req.CustomerID, req.Quantity*100)
 	if err != nil {
 		s.fail(w, r, err)
@@ -194,23 +200,35 @@ func (s *Server) createOrder(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	s.writeSession(o)
 	writeJSON(w, http.StatusCreated, o)
 }
 
-// writeSession stores a checkout session file, like many web frameworks do.
-// The nightly maintenance job removes old ones.
-func (s *Server) writeSession(o store.Order) {
+// writeSession stores a checkout session file. The maintenance job removes
+// old ones.
+func (s *Server) writeSession(req orderRequest) error {
 	if s.SessionDir == "" {
-		return
+		return nil
 	}
 	b := make([]byte, 16)
 	rand.Read(b)
 	name := filepath.Join(s.SessionDir, "sess_"+hex.EncodeToString(b))
-	data := fmt.Sprintf(`{"order_id":%d,"customer_id":%d,"created":%q}`, o.ID, o.CustomerID, o.CreatedAt.Format(time.RFC3339))
-	if err := os.WriteFile(name, []byte(data), 0o600); err != nil {
-		s.Log.Warn("session write failed", "err", err)
+	data := fmt.Sprintf(`{"customer_id":%d,"product_id":%d,"quantity":%d,"created":%q}`,
+		req.CustomerID, req.ProductID, req.Quantity, time.Now().UTC().Format(time.RFC3339))
+	f, err := os.OpenFile(name, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
 	}
+	if _, err := f.WriteString(data); err != nil {
+		f.Close()
+		os.Remove(name)
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		f.Close()
+		os.Remove(name)
+		return err
+	}
+	return f.Close()
 }
 
 func (s *Server) getOrder(w http.ResponseWriter, r *http.Request) {
