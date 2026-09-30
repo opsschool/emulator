@@ -1,0 +1,13 @@
+- id: cause
+  prompt: What filled the disk?
+  type: choice
+  choices:
+    - A core dump
+    - An application log written at debug level
+    - MySQL binary logs
+    - The package cache
+  answer: 1
+- id: file
+  prompt: What was the name of the file that filled the disk (just the file name)?
+  type: text
+  answer_from_var: log_name

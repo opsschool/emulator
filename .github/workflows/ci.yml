@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: make fmt
+      - name: go build
+        run: go build ./...
+      - name: go vet
+        run: make vet
+      - name: go test
+        run: go test -race ./...
+      - name: shellcheck
+        run: make shellcheck
+      - name: opsschool validate
+        run: make validate

@@ -1,0 +1,24 @@
+mitigated:
+  - name: health endpoint is up
+    type: http
+    url: http://{{vm}}/health
+    expect_status: 200
+  - name: order error rate under 1%
+    type: promql
+    expr: >
+      (sum(rate(http_requests_total{route="POST /orders",code=~"5.."}[1m])) or vector(0))
+      / sum(rate(http_requests_total{route="POST /orders"}[1m])) < 0.01
+fixed:
+  - name: log level is not debug
+    type: script
+    run: checks/log_level_ok.sh
+  - name: shop logs are rotated
+    type: script
+    run: checks/logrotate_ok.sh
+  - name: free space on /data is not trending to zero
+    type: promql
+    expr: predict_linear(node_filesystem_avail_bytes{mountpoint="/data"}[10m], 3600) > 0
+preserve:
+  - name: no orders lost
+    type: script
+    run: checks/orders_preserved.sh

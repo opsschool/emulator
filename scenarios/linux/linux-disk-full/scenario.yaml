@@ -1,0 +1,21 @@
+id: linux-disk-full
+title: Disk full
+category: linux
+level: 1
+image: single-node
+curriculum: https://ops-school.readthedocs.io/en/latest/filesystems_101.html
+summary: >
+  Orders are failing. Customers report errors at checkout.
+  Browsing the catalog still works.
+randomize:
+  log_name:
+    choices: [debug.log, trace.log, app-verbose.log]
+  headroom_mb:
+    range: [0, 5]
+fix_verification:
+  restart: [shop.service]
+  reboot: false
+  load_replay: 120s
+mitigate_hold: 60s
+time_limit: 45m
+target_time: 20m
