@@ -50,10 +50,10 @@ func (e *Env) TestScenario(ctx context.Context, s *scenario.Scenario, seed uint6
 		step("quiz answers resolve for 3 seeds", true, "")
 	}
 
+	defer e.Teardown(context.Background())
 	if err := e.Bring(ctx, s); err != nil {
 		return rep, err
 	}
-	defer e.Teardown(context.Background())
 
 	eng := Engine(s, e.Machine, st)
 	gen, err := NewGenerator(s)

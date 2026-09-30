@@ -55,7 +55,13 @@ install_mysql() {
 setup_data_volume() {
   log "data volume"
   if ! grep -q ' /data ' /etc/fstab; then
-    fallocate -l 6G /var/lib/data.img
+    # The container driver commits this file into an image, so keep it
+    # smaller there; the seeded data needs about 1.5 GB.
+    if [[ $mode == container ]]; then
+      truncate -s 3G /var/lib/data.img
+    else
+      fallocate -l 6G /var/lib/data.img
+    fi
     mkfs.ext4 -q -F -L shopdata /var/lib/data.img
     mkdir -p /data
     echo '/var/lib/data.img /data ext4 loop,defaults 0 2' >>/etc/fstab

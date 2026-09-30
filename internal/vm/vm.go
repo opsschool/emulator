@@ -119,7 +119,14 @@ func waitBooted(ctx context.Context, d Driver, timeout time.Duration) error {
 			return nil
 		}
 		if time.Now().After(deadline) {
-			return fmt.Errorf("machine did not finish booting within %s", timeout)
+			failed := ""
+			if r, err := d.Run(ctx, "systemctl --failed --no-legend --plain | awk '{print $1}' | paste -sd' '", nil); err == nil {
+				failed = strings.TrimSpace(r.Stdout)
+			}
+			if failed == "" {
+				failed = "none; shop.service is not active"
+			}
+			return fmt.Errorf("machine did not finish booting within %s (failed units: %s)", timeout, failed)
 		}
 		select {
 		case <-ctx.Done():
