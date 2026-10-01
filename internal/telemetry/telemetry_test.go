@@ -64,7 +64,7 @@ func TestRender(t *testing.T) {
 	}
 	c, _ := os.ReadFile(filepath.Join(nd, "docker-compose.yml"))
 	p, _ := os.ReadFile(filepath.Join(nd, "prometheus.yml"))
-	for _, want := range []string{"external: true", "aliases: [telemetry.opsschool.internal]"} {
+	for _, want := range []string{"external: true", "aliases: [host.lima.internal]"} {
 		if !strings.Contains(string(c), want) {
 			t.Errorf("network compose missing %q:\n%s", want, c)
 		}

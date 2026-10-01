@@ -100,6 +100,12 @@ func BuildContainerBase(ctx context.Context, o BuildOptions) error {
 	if err := step("booting the builder", "docker", append(RunArgs(builder), sys)...); err != nil {
 		return err
 	}
+	// Provisioning while systemd is still booting races with its /tmp
+	// cleanup, which breaks apt's signature checks.
+	if err := step("waiting for boot", "docker", "exec", builder, "bash", "-c",
+		"systemctl is-system-running --wait >/dev/null || true"); err != nil {
+		return err
+	}
 	if err := step("copying the build", "docker", "cp", stage, builder+":/opt/opsschool-build"); err != nil {
 		return err
 	}

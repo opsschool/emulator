@@ -3,9 +3,10 @@
 # when the image is built. $1 is the build directory copied in by build.sh:
 # it holds this script, files/, versions.env and the shop binaries.
 #
-# OPSSCHOOL_PROVISION=container adapts it for the container driver: MySQL
-# comes from the distribution and the exporters and Alloy are already in
-# the image.
+# Expects Ubuntu: 26.04 in the VM (MySQL 8.4), 24.04 in the container
+# (MySQL 8.0).
+# OPSSCHOOL_PROVISION=container adapts it for the container driver: the
+# exporters and Alloy are already in the image.
 set -euo pipefail
 
 build=${1:?usage: provision.sh <build-dir>}
@@ -13,7 +14,6 @@ files="$build/files"
 # shellcheck source=versions.env
 source "$build/versions.env"
 arch=$(dpkg --print-architecture) # amd64 or arm64
-codename=$(. /etc/os-release && echo "$VERSION_CODENAME")
 export DEBIAN_FRONTEND=noninteractive
 mode=${OPSSCHOOL_PROVISION:-vm}
 
@@ -25,29 +25,18 @@ install_packages() {
   apt-get install -y -q --no-install-recommends \
     ca-certificates curl gnupg unzip jq \
     nginx redis-server cron logrotate \
-    strace lsof sysstat tcpdump dnsutils iproute2 iptables htop procps psmisc \
+    strace lsof sysstat tcpdump bind9-dnsutils iproute2 iptables htop procps psmisc \
     net-tools ncat less vim-tiny
   # Tracing tools vary by distribution; install what exists.
-  for pkg in bpftrace linux-perf; do
+  for pkg in bpftrace linux-tools-generic; do
     apt-get install -y -q --no-install-recommends "$pkg" || echo "skipping $pkg"
   done
 }
 
 install_mysql() {
-  if [[ $mode == container ]]; then
-    log "mysql (distribution package)"
-    apt-get install -y -q mysql-server
-    return
-  fi
-  log "mysql ($MYSQL_SERIES)"
-  curl -fsSL https://repo.mysql.com/RPM-GPG-KEY-mysql-2023 | gpg --dearmor -o /usr/share/keyrings/mysql.gpg
-  echo "deb [signed-by=/usr/share/keyrings/mysql.gpg] http://repo.mysql.com/apt/debian $codename $MYSQL_SERIES" \
-    >/etc/apt/sources.list.d/mysql.list
-  apt-get update -q
-  # Empty root password: root logs in over the socket with auth_socket.
-  echo "mysql-community-server mysql-community-server/root-pass password " | debconf-set-selections
-  echo "mysql-community-server mysql-community-server/re-root-pass password " | debconf-set-selections
+  log "mysql (distribution package)"
   apt-get install -y -q mysql-server
+  mysqld --version
 }
 
 # /data is a separate filesystem, as on many production hosts. It holds the
@@ -77,6 +66,11 @@ configure_mysql() {
     chown -R mysql:mysql /data/mysql
   fi
   install -m 0644 "$files/mysql-shop.cnf" /etc/mysql/mysql.conf.d/zz-shop.cnf
+  # Ubuntu's AppArmor profile for mysqld only allows /var/lib/mysql.
+  if [[ -f /etc/apparmor.d/tunables/alias ]] && ! grep -q '/data/mysql' /etc/apparmor.d/tunables/alias; then
+    echo 'alias /var/lib/mysql/ -> /data/mysql/,' >>/etc/apparmor.d/tunables/alias
+    systemctl reload apparmor 2>/dev/null || true
+  fi
   systemctl start mysql
   mysql <<'SQL'
 CREATE DATABASE IF NOT EXISTS shop;
@@ -206,11 +200,6 @@ install_harness() {
 enable_services() {
   log "services"
   sed -i 's/^ENABLED=.*/ENABLED="true"/' /etc/default/sysstat
-  # Alloy pushes logs to telemetry.opsschool.internal. In the VM that is the
-  # host; the container driver points it at the Loki container instead.
-  if [[ $mode != container ]] && ! grep -q telemetry.opsschool.internal /etc/hosts; then
-    echo "192.168.5.2 telemetry.opsschool.internal" >>/etc/hosts
-  fi
   systemctl daemon-reload
   systemctl enable --now redis-server mysql cron sysstat \
     shop-payments shop shop-worker nginx \

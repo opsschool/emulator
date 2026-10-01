@@ -3,6 +3,25 @@
 Changes to [design.md](design.md) and judgment calls made while building.
 Newest first.
 
+## 2026-10-01: Ubuntu 26.04 for the VM and the container
+
+The first Lima build failed because the signing key of MySQL's apt
+repository expired on 2025-10-22. Ubuntu 26.04 LTS ships MySQL 8.4 in its
+own archive, so the VM now uses the Ubuntu 26.04 cloud image and installs
+MySQL from the distribution, with no third-party apt repository. The
+project owner had already approved Ubuntu.
+
+The container driver stays on Ubuntu 24.04 (MySQL 8.0): systemd in 26.04
+requires cgroup v2 and will not boot on Docker hosts that still use cgroup
+v1, which includes the environment this was built in and some WSL setups.
+
+Ubuntu's AppArmor profile for mysqld only allows `/var/lib/mysql`, so
+provisioning adds an AppArmor alias for `/data/mysql`.
+
+Alloy now pushes logs to `host.lima.internal` in both modes: Lima resolves
+it to the host, and the container driver gives the Loki container that
+alias. Provisioning no longer edits `/etc/hosts`.
+
 ## 2026-09-30: Container driver for development and CI
 
 Lima needs hardware virtualization, which the environment this was built in
@@ -11,13 +30,13 @@ machine as a privileged systemd container built from
 `images/single-node/container/Dockerfile` and the same `provision.sh`
 (`OPSSCHOOL_PROVISION=container`). Differences from the VM:
 
-- Ubuntu 24.04 and its MySQL 8.0 package instead of Debian 13 and MySQL
-  8.4, because the Debian and MySQL download hosts were unreachable here.
+- Ubuntu 24.04 and MySQL 8.0, while the VM runs Ubuntu 26.04 and MySQL 8.4
+  (see 2026-10-01).
 - It shares the host kernel: no kernel tuning, and a reboot is a container
   restart.
 - Telemetry joins a Docker network (`opsschool`) and scrapes the machine
-  directly; Loki gets the alias `telemetry.opsschool.internal`, which Alloy
-  pushes to. In the VM that name points at the host (192.168.5.2).
+  directly; Loki gets the alias `host.lima.internal`, which Alloy pushes
+  to, as it does in the VM.
 
 Lima stays the default whenever `limactl` is installed. The project owner
 approved Ubuntu for the container image and the checkout-session change

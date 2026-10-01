@@ -101,7 +101,7 @@ func (d renderData) Net(service string) netSettings {
 	container := map[string]int{"prometheus": 9090, "loki": LokiPort, "grafana": GrafanaPort}[service]
 	n := netSettings{HostNetwork: d.HostNetwork, HostPort: port, ContainerPort: container, Network: d.Network}
 	if service == "loki" {
-		n.Alias = "telemetry.opsschool.internal"
+		n.Alias = "host.lima.internal"
 	}
 	return n
 }
