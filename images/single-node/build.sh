@@ -36,10 +36,23 @@ if limactl list -q | grep -qx "$instance"; then
 fi
 echo "==> creating $instance"
 limactl create --tty=false --name "$instance" "$here/lima.yaml"
+# A half-built base must not be mistaken for a good one: delete it unless
+# the build reaches the end, where the ready marker is written.
+built=false
+cleanup() {
+  rm -rf "$build"
+  if [[ $built != true ]]; then
+    echo "==> build failed; deleting $instance" >&2
+    limactl delete -f "$instance" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup EXIT
 limactl start "$instance"
 limactl copy -r "$build" "$instance:/tmp/opsschool-build"
 limactl shell "$instance" sudo bash /tmp/opsschool-build/provision.sh /tmp/opsschool-build
 limactl shell "$instance" sudo bash /tmp/opsschool-build/smoke.sh
 limactl shell "$instance" sudo rm -rf /tmp/opsschool-build
 limactl stop "$instance"
+touch "$(limactl list --format '{{.Dir}}' "$instance")/opsschool-ready"
+built=true
 echo "==> $instance is built and stopped; sessions start from clones of it"

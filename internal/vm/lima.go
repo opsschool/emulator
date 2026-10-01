@@ -3,6 +3,8 @@ package vm
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -38,8 +40,21 @@ func (l *Lima) has(ctx context.Context, name string) (bool, error) {
 	return false, nil
 }
 
+// ReadyMarker is written into the base instance's directory by
+// images/<image>/build.sh once the build has finished.
+const ReadyMarker = "opsschool-ready"
+
 func (l *Lima) BaseReady(ctx context.Context, image string) (bool, error) {
-	return l.has(ctx, BaseInstance(image))
+	ok, err := l.has(ctx, BaseInstance(image))
+	if err != nil || !ok {
+		return false, err
+	}
+	dir, err := must(ctx, "limactl", "list", "--format", "{{.Dir}}", BaseInstance(image))
+	if err != nil {
+		return false, err
+	}
+	_, err = os.Stat(filepath.Join(strings.TrimSpace(dir), ReadyMarker))
+	return err == nil, nil
 }
 
 func (l *Lima) Create(ctx context.Context, image string) error {
