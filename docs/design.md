@@ -248,7 +248,7 @@ How faults are injected:
 
 ### Single-node
 
-- Base: Debian 12 (or the current Debian stable at build time), amd64 and arm64 so Apple Silicon works.
+- Base: Ubuntu 26.04 LTS, amd64 and arm64 so Apple Silicon works. (Changed from Debian; see decisions.md.)
 - Installed: nginx (reverse proxy to the app), shop app and worker (systemd units), MySQL 8.4 LTS with `performance_schema` and the slow query log enabled, Redis, cron, node\_exporter, process-exporter, mysqld\_exporter, redis\_exporter, Grafana Alloy, and the usual debugging tools (`strace`, `lsof`, `iostat`/`sysstat`, `tcpdump`, `dig`, `ss`, `htop`, `perf` if available).
 - Seed data: a product catalog and order history large enough that a missing index is visibly slow (target: a few million order rows).
 - Built once and cached. `opsschool start` should not reinstall packages.

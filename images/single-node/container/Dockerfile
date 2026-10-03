@@ -7,6 +7,8 @@ FROM oliver006/redis_exporter:v1.92.1 AS redis
 FROM ncabatoff/process-exporter:0.8.7 AS process
 FROM grafana/alloy:v1.20.1 AS alloy
 
+# Ubuntu 24.04, not 26.04 like the VM: systemd in 26.04 needs cgroup v2,
+# and some Docker hosts (including WSL setups) still run cgroup v1.
 FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -q \
