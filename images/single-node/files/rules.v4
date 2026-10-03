@@ -1,0 +1,9 @@
+# Base firewall. Loaded at boot by netfilter-persistent.
+*filter
+:INPUT ACCEPT [0:0]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+# MySQL and Redis are local-only.
+-A INPUT ! -i lo -p tcp -m tcp --dport 3306 -j DROP
+-A INPUT ! -i lo -p tcp -m tcp --dport 6379 -j DROP
+COMMIT

@@ -3,6 +3,156 @@
 Changes to [design.md](design.md) and judgment calls made while building.
 Newest first.
 
+## 2026-10-04: Renamed from simulator to emulator
+
+The project runs real software on a real machine, so the name is now the
+Ops School emulator. The Go module is `github.com/opsschool/emulator`, and the
+GitHub repo is renamed to match (GitHub redirects the old URL). The design spec's
+original suggestion of `opsschool/simulator` is updated.
+
+## 2026-10-04: Scenario IDs are `<category>/<level>.<n>`, and a printed page replaces the title
+
+Scenario IDs and titles named the cause before the learner began
+(`net-dns`, `perf-swap-thrash`, "Disk full", "Too many connections"), and
+learners pick a scenario from `opsschool list`. Now a scenario lives in
+`scenarios/<category>/<level>.<n>/`, for example `scenarios/linux/1.1/`, and
+its ID is `linux/1.1`. The level comes from the directory, so scenario.yaml
+has no `id`, `title` or `level`. `n` numbers scenarios within a level, and a
+new scenario takes the next free number, so adding one never renumbers
+another or reattaches recorded results. The category stays visible on
+purpose. `list` shows only the ID and best result.
+
+In place of a title, a scenario declares `alerts`: one-line alerts that are
+printed as `[FIRING] ...` when the scenario begins, followed by the summary
+as "what people are reporting". There are no real alert rules; the lines are
+written to match what the break does. A scenario with no alerts
+(services/2.1, where only API clients fail) says so and arrives as a report.
+
+The old IDs map as follows. Results recorded under old IDs stay in
+results.jsonl but no longer match a scenario.
+
+| Old | New |
+| --- | --- |
+| linux-disk-full, linux-phantom-disk | linux/1.1, linux/2.1 |
+| perf-cpu-cron, perf-swap-thrash | performance/1.1, performance/2.1 |
+| net-dns, net-iptables-port | networking/1.1, networking/2.1 |
+| db-too-many-conns, db-missing-index | databases/1.1, databases/2.1 |
+| svc-crashloop-env, svc-tls-chain | services/1.1, services/2.1 |
+
+The catalog in design.md uses the same scheme for the planned L3–L4
+scenarios.
+
+## 2026-10-03: The mitigated hold survives a verification
+
+The mitigated tier needs its checks to keep passing for `mitigate_hold`.
+Verify pauses that grading, because it restarts services and can reboot.
+It also used to restart the hold from zero, so a learner who verified early
+got mitigated credit late, or never, if they stopped soon after. Now the hold
+carries on through a verification whose own mitigated checks pass at the
+end; if they fail, it restarts. Mitigated is credited when the hold
+completed, not at the next check after it.
+
+## 2026-10-03: A healthy baseline before each scenario begins
+
+`start` used to start telemetry, boot the machine and break it straight
+away. The dashboards' first minutes then mixed the boot into every rate()
+window. For example, perf-swap-thrash showed 99% CPU while its summary says
+CPU looks low. There was also no normal traffic to compare the incident
+against. Now `start` boots the machine, then starts telemetry, then runs
+load for a two-minute healthy baseline before the break. It explains the
+wait and counts down "Scenario begins in m:ss". The clock, grading, hints
+and verify all start when the scenario begins. `opsschool test` uses the
+same boot-then-telemetry order but skips the baseline.
+
+## 2026-10-03: Verify shows learners check names, not check output
+
+A failed `opsschool verify` printed each failing check's output, which often
+names the cause ("no cron job cleans up /data/sessions at least hourly").
+Learners could verify early to get the answer. Learners now see only the
+names of the failing checks; the output goes to the session daemon log and
+to `opsschool test`. Check names are now learner-visible text, so they state
+the goal, not the cause, and four were renamed.
+
+## 2026-10-03: Telemetry networking under Docker Desktop on Linux and WSL2
+
+The stack used host networking whenever the CLI ran on Linux. Under Docker
+Desktop, including its WSL2 integration, the "host" network is Docker
+Desktop's own VM, so Prometheus never listened on the CLI's 127.0.0.1 and
+`opsschool test` timed out waiting for it. The CLI now asks `docker info`
+and uses host networking only with Docker Engine. Under Docker Desktop it
+uses the macOS setup: published ports on 127.0.0.1, with scrapes going
+through `host.docker.internal`. On WSL2 that name reaches the distro's
+loopback, where Lima forwards the VM's ports. Alloy reaches Loki through
+Lima's host address and the published port.
+
+## 2026-10-03: Journal priorities for the shop's logs
+
+The shop logged JSON to stdout with no priority, so journald recorded every
+line, errors included, at priority 6 and `journalctl -p err` showed nothing.
+Stdout lines now start with a syslog prefix (`<3>` for errors, `<4>` for
+warnings), which journald strips and records as the priority. The log file
+stays plain JSON.
+
+## 2026-10-03: M4 is nine scenarios, not eleven
+
+The catalog has twelve L1–L2 scenarios, but `dist-bad-healthcheck` and
+`dist-clock-skew` need the multi-node image. M4 is the nine single-node
+L1–L2 scenarios besides `linux-disk-full`; those two move to M5 with the
+rest of the distributed category.
+
+## 2026-10-03: Scenario variants left out
+
+- `db-too-many-conns` implements the connection leak only. The binlog
+  disk-full variant overlaps `linux-disk-full`.
+- `linux-phantom-disk` implements both of its variants, picked by seed.
+
+## 2026-10-03: Image additions for M4
+
+- Swap: a 2 GB swap file, as most general-purpose hosts have.
+  `perf-swap-thrash` needs it. The container driver has no swap of its own
+  and no memory limit, so that scenario doesn't thrash there.
+- The worker's render buffer is 256 MB (4 workers, 1 GB). With 32 MB buffers,
+  even 128 workers did not thrash: only the few goroutines handling an order
+  touch their buffer, and the active set fit in RAM.
+- Site DNS: dnsmasq on a dummy interface `svc0` (10.53.0.10) is the site
+  resolver, authoritative for `shop.internal`. systemd-resolved uses it via
+  `/etc/systemd/resolved.conf.d/site-dns.conf`. The shop reaches payments as
+  `payments.shop.internal:8081`. This replaces "Payments by IP for now". The
+  container driver can't do this, because Docker owns `/etc/resolv.conf`; it
+  adds the `shop.internal` names as host entries instead, and `net-dns` only
+  works under Lima.
+- Firewall: `iptables-persistent`, with base rules in
+  `/etc/iptables/rules.v4` (MySQL and Redis local-only).
+- TLS: an internal root and intermediate CA in `/etc/ssl/shop-ca`, with the
+  root in the system trust store. nginx serves `api.shop.internal` and
+  `partners.shop.internal` on 443. `shop-cert-issue <host>` issues a
+  certificate with its full chain.
+- `shop check-config` validates the configuration in the environment and
+  exits, like `nginx -t`.
+
+## 2026-10-03: perf-cpu-cron runs its job at nice -10
+
+A per-minute job running two `gzip -9` processes per core at normal priority
+barely moved the shop's latency: p99 went from 25 ms to about 30 ms, because
+the scheduler serves short wakeups quickly. The job now runs at `nice -n -10`
+("so the feed is never late"), which takes p99 to 100–180 ms and p50 from
+2 ms to 20 ms. Healthy p99 at peak load is about 25 ms, so the checks use
+80 ms.
+
+## 2026-10-03: The MySQL signing key moved
+
+`repo.mysql.com/RPM-GPG-KEY-mysql-2023` serves the release key with its
+original expiry (2025-10-22), and Debian 13's `sqv` rejects it.
+`RPM-GPG-KEY-mysql-2025` is the same key (fingerprint `BCA4 3417 … 785C`) with
+an extended expiry. `versions.env` pins the file name and fingerprint, and
+`provision.sh` checks the fingerprint.
+
+## 2026-10-03: Curriculum links
+
+The curriculum moved from `ops-school.readthedocs.io/en/latest/<chapter>.html`
+(now a 404) to `https://www.opsschool.org/<chapter>.html`. Scenarios link
+there.
+
 ## 2026-09-30: Container driver for development and CI
 
 Lima needs hardware virtualization, which the environment this was built in
@@ -56,7 +206,8 @@ one check failing), which is what grading depends on.
 
 The shop calls its payments stand-in at `127.0.0.1:8081`. The `net-dns`
 scenario (M4) will need a hostname and a local resolver; that is left for
-when the scenario is written.
+when the scenario is written. Superseded on 2026-10-03: see "Image additions
+for M4".
 
 ## 2026-09-30: Download checksums
 

@@ -33,6 +33,11 @@ func RunArgs(name string) []string {
 		"run", "-d", "--name", name, "--hostname", "scenario-vm",
 		"--privileged", "--cgroupns=host", "-v", "/sys/fs/cgroup:/sys/fs/cgroup:rw",
 		"--tmpfs", "/run", "--tmpfs", "/run/lock",
+		// Docker owns /etc/resolv.conf, so the site resolver that the VM
+		// image runs for shop.internal is replaced by host entries.
+		"--add-host", "payments.shop.internal:127.0.0.1",
+		"--add-host", "api.shop.internal:127.0.0.1",
+		"--add-host", "partners.shop.internal:127.0.0.1",
 	}
 }
 

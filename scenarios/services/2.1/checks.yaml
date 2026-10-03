@@ -1,0 +1,12 @@
+mitigated:
+  - name: API clients that trust only the root CA can connect
+    type: script
+    run: checks/api_tls_ok.sh
+  - name: health endpoint is up
+    type: http
+    url: http://{{vm}}/health
+    expect_status: 200
+fixed:
+  - name: every HTTPS site keeps working for clients
+    type: script
+    run: checks/all_tls_ok.sh

@@ -1,0 +1,13 @@
+- id: pattern
+  prompt: What pattern did latency follow?
+  type: choice
+  choices:
+    - It rose steadily all day
+    - High for most of every minute, briefly normal in between
+    - Only during peak traffic
+    - Random spikes with no pattern
+  answer: 1
+- id: job
+  prompt: What was the cron job's name?
+  type: text
+  answer_from_var: job

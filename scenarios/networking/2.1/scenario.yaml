@@ -1,0 +1,20 @@
+category: networking
+image: single-node
+curriculum: https://www.opsschool.org/networking_201.html
+alerts:
+  - "ShopHealthCheckFailing: /health through the load balancer has failed for 2m"
+  - "ShopErrorRate: more than 5% of requests are failing (5xx)"
+summary: >
+  The shop is down: every request through the load balancer fails with a
+  gateway error. SSH to the machine works, and the security team rolled out a
+  firewall hardening change this morning.
+randomize:
+  action:
+    choices: [DROP, REJECT]
+fix_verification:
+  restart: [shop.service, nginx.service]
+  reboot: true
+  load_replay: 60s
+mitigate_hold: 60s
+time_limit: 45m
+target_time: 20m

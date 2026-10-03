@@ -1,0 +1,13 @@
+- id: signal
+  prompt: Which signal showed the machine was swapping?
+  type: choice
+  choices:
+    - High CPU in user space
+    - Constant non-zero si/so in vmstat
+    - Network errors
+    - A full disk
+  answer: 1
+- id: concurrency
+  prompt: What was the worker concurrency set to?
+  type: text
+  answer_from_var: concurrency

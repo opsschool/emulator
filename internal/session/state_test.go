@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/opsschool/simulator/internal/results"
+	"github.com/opsschool/emulator/internal/results"
 )
 
 func TestStateRoundTripAndResult(t *testing.T) {
@@ -15,7 +15,7 @@ func TestStateRoundTripAndResult(t *testing.T) {
 	}
 	start := time.Now().Add(-10 * time.Minute).Truncate(time.Second)
 	st := &State{
-		User: "jdoe", ScenarioID: "linux-disk-full", Level: 1, Seed: 9, StartedAt: start,
+		User: "jdoe", ScenarioID: "linux/1.1", Level: 1, Seed: 9, StartedAt: start,
 		TimeLimit: 45 * time.Minute, TargetTime: 20 * time.Minute, HintsUsed: 1,
 		TierPassed: map[string]time.Time{results.TierMitigated: start.Add(3 * time.Minute), results.TierFixed: start.Add(9 * time.Minute)},
 	}

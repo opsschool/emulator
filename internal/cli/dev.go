@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/opsschool/simulator/internal/loadgen"
-	"github.com/opsschool/simulator/internal/scenario"
-	"github.com/opsschool/simulator/internal/telemetry"
+	"github.com/opsschool/emulator/internal/loadgen"
+	"github.com/opsschool/emulator/internal/scenario"
+	"github.com/opsschool/emulator/internal/telemetry"
 )
 
 // Development commands: run pieces of a session on their own.
@@ -40,7 +40,7 @@ func runTelemetry(e *Env, args []string) error {
 	if args[0] == "down" {
 		return stack.Down(ctx)
 	}
-	title, sid, extra := "No scenario", "none", []byte(nil)
+	sid, extra := "none", []byte(nil)
 	if *id != "" {
 		dir, err := scenariosRoot(e, *root)
 		if err != nil {
@@ -50,9 +50,9 @@ func runTelemetry(e *Env, args []string) error {
 		if err != nil {
 			return err
 		}
-		title, sid, extra = s.Spec.Title, s.Spec.ID, s.Dashboard
+		sid, extra = s.Spec.ID, s.Dashboard
 	}
-	dash, err := telemetry.Dashboard(sid, title, extra)
+	dash, err := telemetry.Dashboard(sid, extra)
 	if err != nil {
 		return err
 	}

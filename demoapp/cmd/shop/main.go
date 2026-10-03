@@ -7,6 +7,7 @@
 //	shop payments     the stand-in payments service
 //	shop migrate      create the schema
 //	shop seed         fill an empty database with catalog and order history
+//	shop check-config validate the configuration in the environment and exit
 //	shop version      print the version
 package main
 
@@ -24,14 +25,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/opsschool/simulator/demoapp/internal/api"
-	"github.com/opsschool/simulator/demoapp/internal/cache"
-	"github.com/opsschool/simulator/demoapp/internal/config"
-	"github.com/opsschool/simulator/demoapp/internal/logging"
-	"github.com/opsschool/simulator/demoapp/internal/metrics"
-	"github.com/opsschool/simulator/demoapp/internal/payments"
-	"github.com/opsschool/simulator/demoapp/internal/store"
-	"github.com/opsschool/simulator/demoapp/internal/worker"
+	"github.com/opsschool/emulator/demoapp/internal/api"
+	"github.com/opsschool/emulator/demoapp/internal/cache"
+	"github.com/opsschool/emulator/demoapp/internal/config"
+	"github.com/opsschool/emulator/demoapp/internal/logging"
+	"github.com/opsschool/emulator/demoapp/internal/metrics"
+	"github.com/opsschool/emulator/demoapp/internal/payments"
+	"github.com/opsschool/emulator/demoapp/internal/store"
+	"github.com/opsschool/emulator/demoapp/internal/worker"
 )
 
 // Version is set at build time with -ldflags "-X main.Version=...".
@@ -39,7 +40,7 @@ var Version = "dev"
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: shop serve|worker|maintenance|payments|migrate|seed|version")
+		fmt.Fprintln(os.Stderr, "usage: shop serve|worker|maintenance|payments|migrate|seed|check-config|version")
 		os.Exit(2)
 	}
 	cmd, args := os.Args[1], os.Args[2:]
@@ -51,6 +52,10 @@ func main() {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "shop:", err)
 		os.Exit(1)
+	}
+	if cmd == "check-config" {
+		fmt.Println("configuration OK")
+		return
 	}
 	log, err := logging.New(cfg.LogLevel, cfg.LogFile)
 	if err != nil {

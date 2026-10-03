@@ -32,20 +32,20 @@ func TestStoreRoundTrip(t *testing.T) {
 	}
 	now := time.Now().UTC().Truncate(time.Second)
 	for i, score := range []int{100, 250, 180} {
-		r := Result{User: "jdoe", Scenario: "linux-disk-full", Seed: uint64(i), StartedAt: now, Score: score}
+		r := Result{User: "jdoe", Scenario: "linux/1.1", Seed: uint64(i), StartedAt: now, Score: score}
 		if err := s.Append(r); err != nil {
 			t.Fatal(err)
 		}
 	}
-	s.Append(Result{User: "other", Scenario: "linux-disk-full", Score: 300})
+	s.Append(Result{User: "other", Scenario: "linux/1.1", Score: 300})
 	rs, err := s.All()
 	if err != nil || len(rs) != 4 {
 		t.Fatalf("got %d results, %v", len(rs), err)
 	}
-	if b := Best(rs, "jdoe")["linux-disk-full"]; b.Score != 250 || !b.StartedAt.Equal(now) {
+	if b := Best(rs, "jdoe")["linux/1.1"]; b.Score != 250 || !b.StartedAt.Equal(now) {
 		t.Errorf("best for jdoe: %+v", b)
 	}
-	if b := Best(rs, "")["linux-disk-full"]; b.Score != 300 {
+	if b := Best(rs, "")["linux/1.1"]; b.Score != 300 {
 		t.Errorf("best overall: %+v", b)
 	}
 }

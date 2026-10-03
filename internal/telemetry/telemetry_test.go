@@ -10,7 +10,7 @@ import (
 
 func TestDashboard(t *testing.T) {
 	extra := []byte(`{"panels": [{"type": "timeseries", "title": "Scenario panel", "gridPos": {"w": 24, "h": 6}}]}`)
-	b, err := Dashboard("linux-disk-full", "Disk full", extra)
+	b, err := Dashboard("linux/1.1", extra)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,10 +47,10 @@ func TestDashboard(t *testing.T) {
 	if got := strings.Join(rows, ","); got != want {
 		t.Errorf("rows %s, want %s", got, want)
 	}
-	if !strings.Contains(string(b), `opsschool_check_passed{scenario=\"linux-disk-full\",tier=\"mitigated\"}`) {
+	if !strings.Contains(string(b), `opsschool_check_passed{scenario=\"linux/1.1\",tier=\"mitigated\"}`) {
 		t.Error("tier status query missing")
 	}
-	if _, err := Dashboard("x", "x", []byte("{")); err == nil {
+	if _, err := Dashboard("x", []byte("{")); err == nil {
 		t.Error("expected error for bad scenario dashboard")
 	}
 }

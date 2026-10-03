@@ -1,0 +1,19 @@
+category: databases
+image: single-node
+curriculum: https://www.opsschool.org/databases_101.html
+alerts:
+  - "ShopHealthCheckFailing: /health through the load balancer has failed for 2m"
+  - "ShopErrorRate: more than 5% of requests are failing (5xx)"
+summary: >
+  The shop is returning errors on most requests and the health check is
+  failing. Release 2.4.0 went out earlier today and looked fine at first.
+randomize:
+  deployed_at:
+    choices: ["09:12", "10:47", "11:30", "13:05"]
+fix_verification:
+  restart: [shop.service]
+  reboot: false
+  load_replay: 120s
+mitigate_hold: 60s
+time_limit: 45m
+target_time: 20m

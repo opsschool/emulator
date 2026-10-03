@@ -1,0 +1,19 @@
+category: databases
+image: single-node
+curriculum: https://www.opsschool.org/databases_201.html
+alerts:
+  - "ShopRouteLatency: p99 of GET /customers/{id}/orders above 500ms for 5m"
+summary: >
+  Customers say their order history page takes forever to load or times
+  out. The rest of the shop feels normal. A schema cleanup was deployed this
+  morning.
+randomize:
+  migration:
+    choices: [20261002_0915, 20261002_0940, 20261002_1010]
+fix_verification:
+  restart: [shop.service]
+  reboot: false
+  load_replay: 120s
+mitigate_hold: 60s
+time_limit: 45m
+target_time: 25m

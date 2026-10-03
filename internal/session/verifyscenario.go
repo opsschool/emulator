@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/opsschool/simulator/internal/checks"
-	"github.com/opsschool/simulator/internal/scenario"
+	"github.com/opsschool/emulator/internal/checks"
+	"github.com/opsschool/emulator/internal/scenario"
 )
 
 // TestReport is the outcome of verifying a scenario end to end.
@@ -95,7 +95,7 @@ func (e *Env) TestScenario(ctx context.Context, s *scenario.Scenario, seed uint6
 	if err != nil {
 		return rep, err
 	}
-	step("after solve: fix verification passes", vr.Pass, joinFailures(vr.Failures))
+	step("after solve: fix verification passes", vr.Pass, joinFailures(vr.Details))
 	return rep, nil
 }
 

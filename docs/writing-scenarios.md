@@ -4,8 +4,8 @@ A scenario breaks the shop, or the machine it runs on, the way a real
 incident would. You write the fault, a reference mitigation, a reference fix
 and the checks that tell them apart. CI proves all four agree.
 
-This guide builds [`linux-disk-full`](../scenarios/linux/linux-disk-full) as
-the worked example. The full format is in [design.md](design.md), "Scenario
+This guide builds [`linux/1.1`](../scenarios/linux/1.1), a full disk, as the
+worked example. The full format is in [design.md](design.md), "Scenario
 spec".
 
 ## 1. Pick the incident
@@ -13,7 +13,7 @@ spec".
 Start from something that happens in production and has a clear mitigation
 and a clear fix that are different from each other.
 
-`linux-disk-full`: someone turned on debug logging to chase a bug and forgot
+`linux/1.1`: someone turned on debug logging to chase a bug and forgot
 to turn it off. The verbose log fills `/data`, which also holds the MySQL
 data directory. Orders fail because MySQL can't write, while browsing keeps
 working from the Redis cache.
@@ -30,9 +30,13 @@ Every single-node scenario runs against the same machine:
 | --- | --- |
 | Shop API | `shop.service`, `127.0.0.1:8080`, behind nginx on port 80 |
 | Worker | `shop-worker.service` |
-| Payments stand-in | `shop-payments.service`, `127.0.0.1:8081` |
+| Payments stand-in | `shop-payments.service`, `payments.shop.internal:8081` (127.0.0.1) |
+| HTTPS | nginx on 443 for `api.shop.internal` and `partners.shop.internal`; internal CA in `/etc/ssl/shop-ca`, `shop-cert-issue <host>` |
+| Site DNS | dnsmasq on `svc0` (10.53.0.10), used by systemd-resolved via `/etc/systemd/resolved.conf.d/site-dns.conf` (Lima only) |
+| Firewall | `/etc/iptables/rules.v4`, loaded at boot by `netfilter-persistent` |
+| Swap | 2 GB, `/var/lib/swapfile` (Lima only) |
 | Maintenance job | `/etc/cron.d/shop-maintenance` |
-| Configuration | `/etc/shop/shop.env` (see `demoapp/internal/config`) |
+| Configuration | `/etc/shop/shop.env` (see `demoapp/internal/config`); `shop check-config` validates it |
 | Binary | `/opt/shop/current` → `/opt/shop/releases/2.3.0` |
 | Alternate builds | `/usr/local/lib/shop-builds/<fault>/shop`, see `demoapp/internal/faults` |
 | Data volume | `/data`: MySQL (`/data/mysql`), logs (`/data/log/shop`), sessions |
@@ -55,12 +59,12 @@ good one apart from the fault.
 ## 3. scenario.yaml
 
 ```yaml
-id: linux-disk-full
-title: Disk full
 category: linux
-level: 1
 image: single-node
-curriculum: https://ops-school.readthedocs.io/en/latest/filesystems_101.html
+curriculum: https://www.opsschool.org/filesystems_101.html
+alerts:
+  - "ShopOrderErrors: more than 5% of POST /orders requests are failing (5xx)"
+  - "HostFilesystemFull: /data has less than 1% space left"
 summary: >
   Orders are failing. Customers report errors at checkout.
   Browsing the catalog still works.
@@ -76,8 +80,14 @@ time_limit: 45m
 target_time: 20m
 ```
 
-- The directory name must equal `id`, under the category's directory.
-- `summary` is all the learner sees. Describe symptoms, like a page would.
+- The directory is `scenarios/<category>/<level>.<n>/` and the ID is `<category>/<level>.<n>`.
+  The directory sets the level (1 to 4); `n` is the next free number at that
+  level. The ID is all a learner knows before it begins, so there is no
+  title to give the fault away.
+- `alerts` and `summary` are all the learner is told. Alerts are what the
+  monitoring would page about, one line each; leave them out if nothing would
+  fire and the incident would arrive as a report. `summary` is what people
+  are saying. Both describe symptoms, never the cause.
 - `randomize` gives each session different details, so a second attempt is
   not identical. Scripts get each value as `OPSSCHOOL_VAR_<NAME>`.
 - `fix_verification` says what `opsschool verify` does before grading `fixed`.
@@ -123,10 +133,10 @@ mitigated:
       (sum(rate(http_requests_total{route="POST /orders",code=~"5.."}[1m])) or vector(0))
       / sum(rate(http_requests_total{route="POST /orders"}[1m])) < 0.01
 fixed:
-  - name: log level is not debug
+  - name: log volume is back to normal
     type: script
     run: checks/log_level_ok.sh
-  - name: shop logs are rotated
+  - name: old shop logs are cleaned up automatically
     type: script
     run: checks/logrotate_ok.sh
   - name: free space on /data is not trending to zero
@@ -143,6 +153,11 @@ preserve:
 - **fixed** is checked by `opsschool verify`, after the restarts and load
   replay. It passes only when the fixed checks, the mitigated checks and the
   preserve checks all pass. Test that the cause is gone, not just the symptom.
+  When verification fails, the learner sees the names of the failing checks
+  but not their output. Name checks after the goal, in terms of what the
+  learner can already see ("database connections stay stable under load"),
+  not the cause ("failed orders do not leave connections open"). Script
+  output is still shown by `opsschool test`, so make it specific.
 - **preserve** catches collateral damage, such as deleting the orders table
   to free space. Preserve scripts run once with `OPSSCHOOL_PHASE=baseline`
   before the break (store what you need in `$OPSSCHOOL_STATE_DIR`) and with
@@ -176,8 +191,8 @@ leave `fixed` failing, which proves the tiers measure different things.
 ## 8. Test it
 
 ```
-opsschool validate scenarios/linux/linux-disk-full
-opsschool test scenarios/linux/linux-disk-full
+opsschool validate scenarios/linux/1.1
+opsschool test scenarios/linux/1.1
 ```
 
 `opsschool test` builds a fresh machine and runs the CI sequence:
@@ -190,4 +205,4 @@ opsschool test scenarios/linux/linux-disk-full
 It needs a built base image: `opsschool image build single-node`. Without
 Lima, add `--driver container` to both commands.
 
-Then play it for real: `opsschool start linux-disk-full --user you`.
+Then play it for real: `opsschool start linux/1.1 --user you`.

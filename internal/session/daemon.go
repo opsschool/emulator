@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
@@ -17,12 +18,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/opsschool/simulator/internal/checks"
-	"github.com/opsschool/simulator/internal/loadgen"
-	"github.com/opsschool/simulator/internal/results"
-	"github.com/opsschool/simulator/internal/scenario"
-	"github.com/opsschool/simulator/internal/telemetry"
-	"github.com/opsschool/simulator/internal/vm"
+	"github.com/opsschool/emulator/internal/checks"
+	"github.com/opsschool/emulator/internal/loadgen"
+	"github.com/opsschool/emulator/internal/results"
+	"github.com/opsschool/emulator/internal/scenario"
+	"github.com/opsschool/emulator/internal/telemetry"
+	"github.com/opsschool/emulator/internal/vm"
 )
 
 // ControlAddr is where the daemon serves /metrics and its control API.
@@ -63,6 +64,7 @@ func (d *Daemon) Run(ctx context.Context) error {
 		return err
 	}
 	d.st = st
+	d.st.DaemonPID = os.Getpid()
 	ctx, d.stop = context.WithCancel(ctx)
 	defer d.stop()
 	d.setupMetrics()
@@ -127,7 +129,7 @@ func (d *Daemon) syncMetrics() {
 func (d *Daemon) tick(ctx context.Context) {
 	d.mu.Lock()
 	d.syncMetrics()
-	skip := d.verifying || d.st.Passed(results.TierMitigated) || d.st.OverTime(time.Now())
+	skip := !d.st.Begun() || d.verifying || d.st.Passed(results.TierMitigated) || d.st.OverTime(time.Now())
 	d.mu.Unlock()
 	if skip {
 		return
@@ -144,8 +146,8 @@ func (d *Daemon) tick(ctx context.Context) {
 	if d.since.IsZero() {
 		d.since = now
 	}
-	if now.Sub(d.since) >= d.Scenario.Spec.MitigateHold.Duration {
-		d.passTier(results.TierMitigated, now)
+	if held := d.since.Add(d.Scenario.Spec.MitigateHold.Duration); !held.After(now) {
+		d.passTier(results.TierMitigated, held)
 	}
 }
 
@@ -198,7 +200,18 @@ func (d *Daemon) handler() http.Handler {
 		}
 		writeJSON(w, s)
 	})
-	mux.HandleFunc("POST /hint", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /begin", func(w http.ResponseWriter, r *http.Request) {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+		if !d.st.Begun() {
+			d.st.StartedAt = time.Now()
+			d.Log.Print("scenario began")
+			d.save()
+			d.syncMetrics()
+		}
+		writeJSON(w, d.st)
+	})
+	mux.HandleFunc("POST /hint", d.begun(func(w http.ResponseWriter, r *http.Request) {
 		d.mu.Lock()
 		defer d.mu.Unlock()
 		if d.st.HintsUsed >= len(d.Scenario.Hints) {
@@ -210,8 +223,8 @@ func (d *Daemon) handler() http.Handler {
 		d.addEvent(fmt.Sprintf("Hint %d revealed.", d.st.HintsUsed))
 		d.syncMetrics()
 		writeJSON(w, map[string]any{"hint": h, "index": d.st.HintsUsed, "total": len(d.Scenario.Hints)})
-	})
-	mux.HandleFunc("POST /quiz", func(w http.ResponseWriter, r *http.Request) {
+	}))
+	mux.HandleFunc("POST /quiz", d.begun(func(w http.ResponseWriter, r *http.Request) {
 		var q results.QuizResult
 		if err := json.NewDecoder(r.Body).Decode(&q); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -222,15 +235,19 @@ func (d *Daemon) handler() http.Handler {
 		d.st.Quiz = &q
 		d.addEvent(fmt.Sprintf("Quiz: %d of %d correct.", q.Correct, q.Total))
 		writeJSON(w, q)
-	})
-	mux.HandleFunc("POST /verify", d.handleVerify)
+	}))
+	mux.HandleFunc("POST /verify", d.begun(d.handleVerify))
 	mux.HandleFunc("POST /stop", func(w http.ResponseWriter, r *http.Request) {
 		d.mu.Lock()
 		res := d.st.Result(time.Now())
+		begun := d.st.Begun()
 		d.mu.Unlock()
-		if err := results.Open(d.Home).Append(res); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+		// A session stopped before it began has nothing to record.
+		if begun {
+			if err := results.Open(d.Home).Append(res); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
 		writeJSON(w, res)
 		go func() { time.Sleep(200 * time.Millisecond); d.stop() }()
@@ -253,7 +270,7 @@ func (d *Daemon) handleVerify(w http.ResponseWriter, r *http.Request) {
 	}
 	d.verifying = true
 	d.mu.Unlock()
-	defer func() { d.mu.Lock(); d.verifying = false; d.since = time.Time{}; d.mu.Unlock() }()
+	defer func() { d.mu.Lock(); d.verifying = false; d.mu.Unlock() }()
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	fl, _ := w.(http.Flusher)
@@ -266,26 +283,65 @@ func (d *Daemon) handleVerify(w http.ResponseWriter, r *http.Request) {
 	}
 	v := &Verifier{Scenario: d.Scenario, Machine: d.Machine, Engine: d.Engine, Load: d.Load}
 	rep, err := v.Run(r.Context(), say)
+	d.mu.Lock()
 	if err != nil {
+		d.finishVerify(nil, time.Now())
+		d.mu.Unlock()
 		say("ERROR " + err.Error())
 		return
 	}
-	d.mu.Lock()
-	d.st.LastVerify = &rep
-	if rep.DataLoss {
-		d.st.DataLoss = true
-	}
-	if rep.Pass {
-		now := time.Now()
-		// A verified fix leaves the service healthy, so it also mitigates.
-		d.passTier(results.TierMitigated, now)
-		d.passTier(results.TierFixed, now)
-	} else {
-		d.addEvent(fmt.Sprintf("Fix verification failed (%d problem(s)).", len(rep.Failures)))
-	}
+	d.finishVerify(&rep, time.Now())
 	d.mu.Unlock()
 	b, _ := json.Marshal(rep)
 	say("RESULT " + string(b))
+}
+
+// begun rejects requests that need the scenario to have begun.
+func (d *Daemon) begun(h http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		d.mu.Lock()
+		ok := d.st.Begun()
+		d.mu.Unlock()
+		if !ok {
+			http.Error(w, "the scenario has not begun yet", http.StatusConflict)
+			return
+		}
+		h(w, r)
+	}
+}
+
+// finishVerify records a verification's outcome; rep is nil when it could
+// not run. Call with d.mu held. The mitigated hold keeps running through a
+// verification whose mitigated checks pass at the end: the restarts and
+// reboot were the grader's doing, not the learner's.
+func (d *Daemon) finishVerify(rep *VerifyReport, now time.Time) {
+	if rep == nil || !rep.MitigatedPass {
+		d.since = time.Time{}
+	}
+	if rep == nil {
+		return
+	}
+	d.st.LastVerify = rep
+	if rep.DataLoss {
+		d.st.DataLoss = true
+	}
+	if !rep.Pass {
+		d.addEvent(fmt.Sprintf("Fix verification failed (%d problem(s)).", len(rep.Failures)))
+		for _, f := range rep.Details {
+			d.Log.Print("verify failed: " + f)
+		}
+		return
+	}
+	// A verified fix leaves the service healthy, so it also mitigates: when
+	// the hold completed, or now if it hadn't.
+	mitigated := now
+	if !d.since.IsZero() {
+		if held := d.since.Add(d.Scenario.Spec.MitigateHold.Duration); held.Before(now) {
+			mitigated = held
+		}
+	}
+	d.passTier(results.TierMitigated, mitigated)
+	d.passTier(results.TierFixed, now)
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

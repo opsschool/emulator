@@ -1,10 +1,10 @@
-// Command opsschool runs Ops School simulator scenarios.
+// Command opsschool runs Ops School emulator scenarios.
 package main
 
 import (
 	"os"
 
-	"github.com/opsschool/simulator/internal/cli"
+	"github.com/opsschool/emulator/internal/cli"
 )
 
 func main() {

@@ -1,0 +1,4 @@
+# Service-side interface for site services (the site resolver).
+[NetDev]
+Name=svc0
+Kind=dummy

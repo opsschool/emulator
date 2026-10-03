@@ -19,11 +19,11 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/opsschool/simulator/demoapp/internal/cache"
-	"github.com/opsschool/simulator/demoapp/internal/faults"
-	"github.com/opsschool/simulator/demoapp/internal/metrics"
-	"github.com/opsschool/simulator/demoapp/internal/payments"
-	"github.com/opsschool/simulator/demoapp/internal/store"
+	"github.com/opsschool/emulator/demoapp/internal/cache"
+	"github.com/opsschool/emulator/demoapp/internal/faults"
+	"github.com/opsschool/emulator/demoapp/internal/metrics"
+	"github.com/opsschool/emulator/demoapp/internal/payments"
+	"github.com/opsschool/emulator/demoapp/internal/store"
 )
 
 // Server holds the API's dependencies.

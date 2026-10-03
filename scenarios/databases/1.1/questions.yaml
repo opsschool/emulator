@@ -1,0 +1,18 @@
+- id: holder
+  prompt: What state were most of MySQL's connections in?
+  type: choice
+  choices:
+    - Running long queries
+    - Waiting for table locks
+    - Idle, with a transaction still open
+    - Stuck in authentication
+  answer: 2
+- id: why-1040
+  prompt: Why did MySQL refuse connections instead of the shop just running out of its own pool?
+  type: choice
+  choices:
+    - The pool size was larger than MySQL's max_connections
+    - MySQL crashed and restarted
+    - The worker opened too many connections
+    - The exporter leaked connections
+  answer: 0

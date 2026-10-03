@@ -1,0 +1,18 @@
+mitigated:
+  - name: health endpoint is up
+    type: http
+    url: http://{{vm}}/health
+    expect_status: 200
+  - name: error rate under 1%
+    type: promql
+    expr: >
+      (sum(rate(http_requests_total{code=~"5.."}[1m])) or vector(0))
+      / sum(rate(http_requests_total[1m])) < 0.01
+fixed:
+  - name: database connections stay stable under load
+    type: script
+    run: checks/no_leak.sh
+preserve:
+  - name: no orders lost
+    type: script
+    run: checks/orders_preserved.sh

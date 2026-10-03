@@ -22,9 +22,13 @@ log() { echo "==> $*"; }
 install_packages() {
   log "packages"
   apt-get update -q
+  # Persisted firewall rules are written by configure_firewall, not saved
+  # from whatever is loaded at install time.
+  echo "iptables-persistent iptables-persistent/autosave_v4 boolean false" | debconf-set-selections
+  echo "iptables-persistent iptables-persistent/autosave_v6 boolean false" | debconf-set-selections
   apt-get install -y -q --no-install-recommends \
-    ca-certificates curl gnupg unzip jq \
-    nginx redis-server cron logrotate \
+    ca-certificates curl gnupg unzip jq openssl \
+    nginx redis-server cron logrotate iptables-persistent \
     strace lsof sysstat tcpdump dnsutils iproute2 iptables htop procps psmisc \
     net-tools ncat less vim-tiny
   # Tracing tools vary by distribution; install what exists.
@@ -40,7 +44,12 @@ install_mysql() {
     return
   fi
   log "mysql ($MYSQL_SERIES)"
-  curl -fsSL https://repo.mysql.com/RPM-GPG-KEY-mysql-2023 | gpg --dearmor -o /usr/share/keyrings/mysql.gpg
+  # The -2023 file carries an expired copy of this key; -2025 extends it.
+  curl -fsSL "https://repo.mysql.com/$MYSQL_KEY_FILE" | gpg --dearmor -o /usr/share/keyrings/mysql.gpg
+  if ! gpg --show-keys --with-colons /usr/share/keyrings/mysql.gpg | grep -q "^fpr:::::::::$MYSQL_KEY_FPR:"; then
+    echo "MySQL signing key does not have fingerprint $MYSQL_KEY_FPR; check https://repo.mysql.com" >&2
+    exit 1
+  fi
   echo "deb [signed-by=/usr/share/keyrings/mysql.gpg] http://repo.mysql.com/apt/debian $codename $MYSQL_SERIES" \
     >/etc/apt/sources.list.d/mysql.list
   apt-get update -q
@@ -85,6 +94,81 @@ GRANT ALL ON shop.* TO 'shop'@'localhost';
 CREATE USER IF NOT EXISTS 'exporter'@'localhost' IDENTIFIED BY 'exporter' WITH MAX_USER_CONNECTIONS 3;
 GRANT PROCESS, REPLICATION CLIENT, SELECT ON *.* TO 'exporter'@'localhost';
 SQL
+}
+
+# Swap, as on most general-purpose hosts. performance/2.1 depends on it.
+setup_swap() {
+  [[ $mode == container ]] && return # the container shares the host's memory
+  log "swap"
+  if ! grep -q ' swap ' /etc/fstab; then
+    fallocate -l 2G /var/lib/swapfile
+    chmod 0600 /var/lib/swapfile
+    mkswap -q /var/lib/swapfile
+    echo '/var/lib/swapfile none swap sw 0 0' >>/etc/fstab
+  fi
+  swapon -a
+}
+
+# The site resolver: dnsmasq answers for shop.internal on a service-side
+# dummy interface (svc0, 10.53.0.10) and forwards everything else upstream.
+# systemd-resolved uses it for all lookups. networking/1.1 breaks this path.
+configure_site_dns() {
+  [[ $mode == container ]] && return # Docker owns resolv.conf; see decisions.md
+  log "site dns"
+  local upstream
+  upstream=$(resolvectl dns eth0 | awk '{print $NF}')
+  install -m 0644 "$files/svc0.netdev" "$files/svc0.network" /etc/systemd/network/
+  networkctl reload
+  install -d /etc/dnsmasq.d
+  sed "s/@UPSTREAM@/${upstream:-192.168.5.3}/" "$files/dnsmasq-site.conf" >/etc/dnsmasq.d/site.conf
+  apt-get install -y -q --no-install-recommends dnsmasq
+  # dnsmasq only serves the site zone here. Keep Debian's helper from handing
+  # it a resolv file and registering 127.0.0.1 with resolvconf: both log
+  # warnings at every boot that look like DNS trouble.
+  sed -i 's/^#IGNORE_RESOLVCONF=yes/IGNORE_RESOLVCONF=yes/; s/^#DNSMASQ_EXCEPT="lo"/DNSMASQ_EXCEPT="lo"/' /etc/default/dnsmasq
+  install -d /etc/systemd/resolved.conf.d
+  install -m 0644 "$files/resolved-site-dns.conf" /etc/systemd/resolved.conf.d/site-dns.conf
+  systemctl restart systemd-resolved
+  systemctl enable dnsmasq
+  systemctl restart dnsmasq
+}
+
+# Base firewall: the database and cache are reachable only locally. Loaded
+# at boot by netfilter-persistent. networking/2.1 breaks this.
+configure_firewall() {
+  log "firewall"
+  install -d /etc/iptables
+  install -m 0640 "$files/rules.v4" /etc/iptables/rules.v4
+  systemctl enable netfilter-persistent
+  iptables-restore </etc/iptables/rules.v4
+}
+
+# TLS for api.shop.internal and partners.shop.internal, issued by an
+# internal CA that lives on this machine (as it would on a CA host). The root
+# is in the system trust store; the intermediate is not, as on most clients.
+configure_tls() {
+  log "tls"
+  local ca=/etc/ssl/shop-ca
+  install -d -m 0700 "$ca"
+  install -m 0755 "$files/shop-cert-issue" /usr/local/sbin/shop-cert-issue
+  if [[ ! -f "$ca/intermediate.crt" ]]; then
+    openssl req -x509 -newkey rsa:3072 -nodes -keyout "$ca/root.key" -out "$ca/root.crt" \
+      -days 3650 -subj "/O=Shop Internal/CN=Shop Internal Root CA" \
+      -addext "basicConstraints=critical,CA:true" -addext "keyUsage=critical,keyCertSign,cRLSign"
+    openssl req -newkey rsa:3072 -nodes -keyout "$ca/intermediate.key" -out "$ca/intermediate.csr" \
+      -subj "/O=Shop Internal/CN=Shop Internal Issuing CA 1"
+    openssl x509 -req -in "$ca/intermediate.csr" -CA "$ca/root.crt" -CAkey "$ca/root.key" \
+      -CAcreateserial -out "$ca/intermediate.crt" -days 1825 \
+      -extfile <(printf 'basicConstraints=critical,CA:true,pathlen:0\nkeyUsage=critical,keyCertSign,cRLSign\n')
+    rm -f "$ca/intermediate.csr"
+  fi
+  install -m 0644 "$ca/root.crt" /usr/local/share/ca-certificates/shop-internal-root-ca.crt
+  update-ca-certificates
+  for host in api.shop.internal partners.shop.internal; do
+    [[ -f "/etc/nginx/tls/$host.crt" ]] || /usr/local/sbin/shop-cert-issue "$host"
+  done
+  install -m 0644 "$files/nginx-shop-tls.conf" /etc/nginx/sites-available/shop-tls
+  ln -sfn /etc/nginx/sites-available/shop-tls /etc/nginx/sites-enabled/shop-tls
 }
 
 install_shop() {
@@ -223,7 +307,11 @@ main() {
   install_mysql
   setup_data_volume
   configure_mysql
+  setup_swap
+  configure_site_dns
+  configure_firewall
   install_shop
+  configure_tls
   seed_database
   install_exporters
   install_alloy

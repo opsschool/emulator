@@ -56,7 +56,6 @@ const (
 
 var (
 	boolModifier   = regexp.MustCompile(`(==|!=|<=|>=|<|>)\s*bool\b`)
-	idPattern      = regexp.MustCompile(`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
 	varNamePattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 )
 
@@ -91,27 +90,21 @@ func (v *validator) spec() {
 	sp := v.s.Spec
 	f := FileScenario
 	dirName := filepath.Base(v.s.Dir)
-	switch {
-	case sp.ID == "":
-		v.errf(f, 0, "id is required")
-	case !idPattern.MatchString(sp.ID):
-		v.errf(f, 0, "id %q must be lowercase words separated by hyphens", sp.ID)
-	case sp.ID != dirName:
-		v.errf(f, 0, "id %q does not match directory name %q", sp.ID, dirName)
-	}
-	if sp.Title == "" {
-		v.errf(f, 0, "title is required")
+	if sp.Level == 0 {
+		v.errf(f, 0, "directory name %q must be <level>.<n>, like 1.1 or 2.3: a level from 1 to 4, then the next free number at that level", dirName)
 	}
 	if !slices.Contains(Categories, sp.Category) {
 		v.errf(f, 0, "category %q must be one of %s", sp.Category, strings.Join(Categories, ", "))
 	} else if parent := filepath.Base(filepath.Dir(v.s.Dir)); parent != sp.Category {
 		v.errf(f, 0, "scenario is in directory %q but its category is %q; move it to scenarios/%s/%s", parent, sp.Category, sp.Category, dirName)
 	}
-	if sp.Level < 1 || sp.Level > 4 {
-		v.errf(f, 0, "level must be 1, 2, 3 or 4, got %d", sp.Level)
-	}
 	if !slices.Contains(Images, sp.Image) {
 		v.errf(f, 0, "image %q must be one of %s", sp.Image, strings.Join(Images, ", "))
+	}
+	for i, a := range sp.Alerts {
+		if strings.TrimSpace(a) == "" || strings.Contains(a, "\n") {
+			v.errf(f, 0, "alerts[%d] must be one line, like \"ShopErrorRate: more than 5%% of requests are failing\"", i)
+		}
 	}
 	if strings.TrimSpace(sp.Summary) == "" {
 		v.errf(f, 0, "summary is required: describe the symptoms the way a page or user report would")

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -15,15 +16,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/opsschool/simulator/internal/results"
-	"github.com/opsschool/simulator/internal/scenario"
-	"github.com/opsschool/simulator/internal/session"
-	"github.com/opsschool/simulator/internal/telemetry"
-	"github.com/opsschool/simulator/internal/vm"
+	"github.com/opsschool/emulator/internal/results"
+	"github.com/opsschool/emulator/internal/scenario"
+	"github.com/opsschool/emulator/internal/session"
+	"github.com/opsschool/emulator/internal/telemetry"
+	"github.com/opsschool/emulator/internal/vm"
 )
 
 func init() {
-	register("start", "start <id> --user <name>", "Start a scenario: boot the machine, break it, start load and grading.", runStart)
+	register("start", "start <category>/<level>.<n> --user <name>", "Start a scenario: boot the machine, break it, start load and grading.", runStart)
 	register("shell", "shell", "Open a root shell in the scenario machine.", runShell)
 	register("status", "status [-w]", "Show tier progress, elapsed time and hints used.", runStatus)
 	register("hint", "hint", "Reveal the next hint (costs points).", runHint)
@@ -107,11 +108,8 @@ func runStart(e *Env, args []string) error {
 	if err := env.Bring(ctx, s); err != nil {
 		return fail(err)
 	}
-	say("Breaking something")
-	if err := session.Break(ctx, session.Engine(s, m, st), m, s); err != nil {
-		return fail(err)
-	}
-	st.StartedAt = time.Now()
+	// The daemon starts load now; it grades and runs the clock only once
+	// the scenario begins, after the baseline and the break.
 	if err := session.Save(home, st); err != nil {
 		return fail(err)
 	}
@@ -122,11 +120,30 @@ func runStart(e *Env, args []string) error {
 	}
 	st.DaemonPID = pid
 	session.Save(home, st)
+	abort := func(err error) error {
+		syscall.Kill(pid, syscall.SIGTERM)
+		session.Clear(home)
+		return fail(err)
+	}
 	if err := waitDaemon(ctx); err != nil {
-		return fail(fmt.Errorf("%w (see %s)", err, filepath.Join(session.Dir(home), "daemon.log")))
+		return abort(fmt.Errorf("%w (see %s)", err, filepath.Join(session.Dir(home), "daemon.log")))
+	}
+	fmt.Fprintf(e.Stdout, "\nThe shop is up and serving normal traffic. The dashboards are live at\n"+
+		"%s and, for the next %s, show the shop healthy, so you\n"+
+		"have something to compare against once the scenario begins. The clock\n"+
+		"hasn't started yet.\n\n", telemetry.GrafanaURL(), shortDuration(session.Baseline))
+	if err := countdown(ctx, e.Stdout, "Scenario begins in", session.Baseline); err != nil {
+		return abort(err)
+	}
+	say("Breaking something")
+	if err := session.Break(ctx, session.Engine(s, m, st), m, s); err != nil {
+		return abort(err)
+	}
+	if err := (session.Client{}).Post("/begin", nil, nil); err != nil {
+		return abort(err)
 	}
 
-	fmt.Fprintf(e.Stdout, "\n%s (L%d, %s)\n\n%s\n\n", s.Spec.Title, s.Spec.Level, s.Spec.Category, indent(strings.TrimSpace(s.Spec.Summary), "  "))
+	printPage(e.Stdout, s)
 	fmt.Fprintf(e.Stdout, "Shell:      opsschool shell\n")
 	fmt.Fprintf(e.Stdout, "Dashboards: %s\n", telemetry.GrafanaURL())
 	fmt.Fprintf(e.Stdout, "Shop:       http://127.0.0.1:%d\n", telemetry.ShopPort)
@@ -134,6 +151,81 @@ func runStart(e *Env, args []string) error {
 	fmt.Fprintln(e.Stdout, "The mitigated tier is graded continuously. When you think you have fixed")
 	fmt.Fprintln(e.Stdout, "the cause, run `opsschool verify`. `opsschool status` shows progress.")
 	return nil
+}
+
+// printPage shows the scenario the way an on-call engineer would get it: the
+// alerts that are firing, then what people have reported.
+func printPage(w io.Writer, s *scenario.Scenario) {
+	fmt.Fprintf(w, "\nScenario %s (level %d) has begun.\n\n", s.Spec.ID, s.Spec.Level)
+	if len(s.Spec.Alerts) == 0 {
+		fmt.Fprintln(w, "No alerts are firing. This one was reported by people:")
+	} else {
+		for _, a := range s.Spec.Alerts {
+			fmt.Fprintf(w, "  [FIRING] %s\n", a)
+		}
+		fmt.Fprintln(w, "\nWhat people are reporting:")
+	}
+	fmt.Fprintf(w, "\n%s\n\n", indent(wrap(strings.TrimSpace(s.Spec.Summary), 72), "  "))
+}
+
+// countdown waits for d, showing the time left. On a terminal the line
+// updates in place every second; otherwise it is printed every 30 seconds.
+func countdown(ctx context.Context, w io.Writer, label string, d time.Duration) error {
+	tty := isTerminal(w)
+	end := time.Now().Add(d)
+	t := time.NewTicker(time.Second)
+	defer t.Stop()
+	shown := time.Duration(-1)
+	for {
+		left := max(0, time.Until(end).Round(time.Second))
+		if tty {
+			fmt.Fprintf(w, "\r%s %s ", label, clock(left))
+		} else if left != shown && (shown < 0 || left%(30*time.Second) == 0) {
+			fmt.Fprintf(w, "%s %s\n", label, clock(left))
+			shown = left
+		}
+		if left == 0 {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			if tty {
+				fmt.Fprintln(w)
+			}
+			return ctx.Err()
+		case <-t.C:
+		}
+	}
+	if tty {
+		fmt.Fprintln(w)
+	}
+	return nil
+}
+
+// clock formats d as m:ss.
+func clock(d time.Duration) string {
+	d = d.Round(time.Second)
+	return fmt.Sprintf("%d:%02d", int(d.Minutes()), int(d.Seconds())%60)
+}
+
+// shortDuration formats d as "2 minutes" or "90 seconds".
+func shortDuration(d time.Duration) string {
+	if d%time.Minute == 0 {
+		if d == time.Minute {
+			return "minute"
+		}
+		return fmt.Sprintf("%d minutes", int(d.Minutes()))
+	}
+	return fmt.Sprintf("%d seconds", int(d.Seconds()))
+}
+
+func isTerminal(w io.Writer) bool {
+	f, ok := w.(*os.File)
+	if !ok {
+		return false
+	}
+	fi, err := f.Stat()
+	return err == nil && fi.Mode()&os.ModeCharDevice != 0
 }
 
 func splitFirst(args []string) (string, []string) {
@@ -255,6 +347,9 @@ func loadRunning(e *Env) (string, *session.State, error) {
 }
 
 func runShell(e *Env, args []string) error {
+	if err := noArgs(e, "shell", args); err != nil {
+		return err
+	}
 	_, st, err := loadRunning(e)
 	if err != nil {
 		return err
@@ -293,6 +388,10 @@ func runStatus(e *Env, args []string) error {
 
 func printStatus(e *Env, s *session.Status) {
 	st := s.State
+	if !st.Begun() {
+		fmt.Fprintf(e.Stdout, "%s as %s   not begun yet: the shop is running healthy before the scenario starts\n", st.ScenarioID, st.User)
+		return
+	}
 	fmt.Fprintf(e.Stdout, "%s as %s   elapsed %s of %s   hints %d\n\n", st.ScenarioID, st.User, s.Elapsed, st.TimeLimit, st.HintsUsed)
 	for _, t := range results.Tiers {
 		line := "not yet"
@@ -333,6 +432,9 @@ func printStatus(e *Env, s *session.Status) {
 }
 
 func runHint(e *Env, args []string) error {
+	if err := noArgs(e, "hint", args); err != nil {
+		return err
+	}
 	if _, _, err := loadRunning(e); err != nil {
 		return err
 	}
@@ -352,6 +454,9 @@ func runHint(e *Env, args []string) error {
 }
 
 func runVerify(e *Env, args []string) error {
+	if err := noArgs(e, "verify", args); err != nil {
+		return err
+	}
 	if _, _, err := loadRunning(e); err != nil {
 		return err
 	}
@@ -400,6 +505,9 @@ func runVerify(e *Env, args []string) error {
 }
 
 func runQuiz(e *Env, args []string) error {
+	if err := noArgs(e, "quiz", args); err != nil {
+		return err
+	}
 	_, st, err := loadRunning(e)
 	if err != nil {
 		return err
@@ -452,6 +560,9 @@ func runQuiz(e *Env, args []string) error {
 }
 
 func runStop(e *Env, args []string) error {
+	if err := noArgs(e, "stop", args); err != nil {
+		return err
+	}
 	home, st, err := loadRunning(e)
 	if err != nil {
 		return err

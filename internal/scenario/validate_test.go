@@ -8,12 +8,11 @@ import (
 )
 
 var validFiles = map[string]string{
-	FileScenario: `id: linux-stub
-title: Stub
-category: linux
-level: 1
+	FileScenario: `category: linux
 image: single-node
 curriculum: https://ops-school.readthedocs.io/
+alerts:
+  - "ShopErrorRate: more than 5% of requests are failing"
 summary: Something is wrong.
 randomize:
   name:
@@ -50,7 +49,7 @@ fixed:
 // override deletes the file.
 func writeScenario(t *testing.T, overrides map[string]string) string {
 	t.Helper()
-	dir := filepath.Join(t.TempDir(), "linux", "linux-stub")
+	dir := filepath.Join(t.TempDir(), "linux", "1.1")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -85,6 +84,33 @@ func TestValidStub(t *testing.T) {
 	}
 }
 
+func TestIDsAndOrder(t *testing.T) {
+	root := t.TempDir()
+	for _, n := range []string{"1.10", "2.1", "1.2", "1.1"} {
+		dir := filepath.Join(root, "linux", n)
+		os.MkdirAll(dir, 0o755)
+		os.WriteFile(filepath.Join(dir, FileScenario), []byte(validFiles[FileScenario]), 0o644)
+		os.WriteFile(filepath.Join(dir, FileChecks), []byte(validFiles[FileChecks]), 0o644)
+	}
+	scs, errs := LoadAll(root)
+	if len(errs) != 0 {
+		t.Fatal(errs)
+	}
+	var ids []string
+	for _, s := range scs {
+		ids = append(ids, s.Spec.ID)
+	}
+	if got := strings.Join(ids, " "); got != "linux/1.1 linux/1.2 linux/1.10 linux/2.1" {
+		t.Errorf("order: %s", got)
+	}
+	if s, err := Find(root, "linux/1.10"); err != nil || s.Spec.ID != "linux/1.10" || s.Spec.Level != 1 {
+		t.Errorf("Find: %v %v", s, err)
+	}
+	if _, err := Find(root, "1.10"); err == nil {
+		t.Error("Find matched an ID without a category")
+	}
+}
+
 func TestBrokenScenarios(t *testing.T) {
 	replace := func(file, old, new string) map[string]string {
 		if !strings.Contains(validFiles[file], old) {
@@ -97,14 +123,15 @@ func TestBrokenScenarios(t *testing.T) {
 		overrides map[string]string
 		want      string
 	}{
-		{"id mismatch", replace(FileScenario, "id: linux-stub", "id: linux-other"), `does not match directory name "linux-stub"`},
+		{"id in file", replace(FileScenario, "category: linux", "id: linux-stub\ncategory: linux"), "field id not found"},
+		{"multi-line alert", replace(FileScenario, `- "ShopErrorRate`, `- "ShopErrorRate\n`), "alerts[0] must be one line"},
 		{"bad category", replace(FileScenario, "category: linux", "category: cooking"), `category "cooking" must be one of`},
-		{"wrong category dir", replace(FileScenario, "category: linux", "category: databases"), "move it to scenarios/databases/linux-stub"},
-		{"bad level", replace(FileScenario, "level: 1", "level: 7"), "level must be 1, 2, 3 or 4, got 7"},
+		{"wrong category dir", replace(FileScenario, "category: linux", "category: databases"), "move it to scenarios/databases/1.1"},
+		{"level in file", replace(FileScenario, "image: single-node", "image: single-node\nlevel: 1"), "field level not found"},
 		{"no summary", replace(FileScenario, "summary: Something is wrong.", ""), "summary is required"},
 		{"bad curriculum", replace(FileScenario, "https://ops-school.readthedocs.io/", "chapter 3"), "curriculum must be an http(s) URL"},
-		{"unknown field", replace(FileScenario, "level: 1", "level: 1\nlevle: 2"), "field levle not found"},
-		{"bad duration", replace(FileScenario, "level: 1", "level: 1\ntime_limit: soon"), `invalid duration "soon"`},
+		{"unknown field", replace(FileScenario, "image: single-node", "image: single-node\nimgae: x"), "field imgae not found"},
+		{"bad duration", replace(FileScenario, "image: single-node", "image: single-node\ntime_limit: soon"), `invalid duration "soon"`},
 		{"reversed range", replace(FileScenario, "range: [1, 3]", "range: [3, 1]"), "range [3, 1] is reversed"},
 		{"unused var", replace(FileBreak, " $OPSSCHOOL_VAR_SIZE", ""), "randomized variable size is never used"},
 		{"missing solve", map[string]string{FileSolve: ""}, "solve.sh: error: file is missing"},

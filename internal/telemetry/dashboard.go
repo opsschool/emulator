@@ -111,7 +111,7 @@ var passThresholds = []any{
 // Dashboard builds the scenario dashboard: the base rows every scenario gets,
 // then the scenario's own panels, if any. extra is the scenario's
 // dashboard.json: {"panels": [...]}.
-func Dashboard(scenarioID, title string, extra []byte) ([]byte, error) {
+func Dashboard(scenarioID string, extra []byte) ([]byte, error) {
 	b := &builder{}
 
 	b.row("Tier status")
@@ -217,7 +217,7 @@ func Dashboard(scenarioID, title string, extra []byte) ([]byte, error) {
 
 	return json.MarshalIndent(map[string]any{
 		"uid":           "scenario",
-		"title":         "Ops School: " + title,
+		"title":         "Ops School: " + scenarioID,
 		"editable":      true,
 		"refresh":       "5s",
 		"time":          map[string]string{"from": "now-15m", "to": "now"},

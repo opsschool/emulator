@@ -5,12 +5,12 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/opsschool/simulator/internal/results"
-	"github.com/opsschool/simulator/internal/scenario"
+	"github.com/opsschool/emulator/internal/results"
+	"github.com/opsschool/emulator/internal/scenario"
 )
 
 func init() {
-	register("list", "list [--user name]", "List scenarios with category, level and your best result.", runList)
+	register("list", "list [--user name]", "List scenarios (<category>/<level>.<n>) and your best result.", runList)
 }
 
 func runList(e *Env, args []string) error {
@@ -43,9 +43,9 @@ func runList(e *Env, args []string) error {
 		}
 	}
 	tw := tabwriter.NewWriter(e.Stdout, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(tw, "ID\tCATEGORY\tLEVEL\tTITLE\tBEST")
+	fmt.Fprintln(tw, "ID\tBEST")
 	for _, s := range scs {
-		fmt.Fprintf(tw, "%s\t%s\tL%d\t%s\t%s\n", s.Spec.ID, s.Spec.Category, s.Spec.Level, s.Spec.Title, bestLabel(best, s.Spec.ID))
+		fmt.Fprintf(tw, "%s\t%s\n", s.Spec.ID, bestLabel(best, s.Spec.ID))
 	}
 	return tw.Flush()
 }

@@ -1,0 +1,13 @@
+- id: where
+  prompt: Where did the service report why it would not start?
+  type: choice
+  choices:
+    - nginx's error log
+    - The systemd journal for shop.service
+    - MySQL's error log
+    - dmesg
+  answer: 1
+- id: setting
+  prompt: Which variable in shop.env had the bad value?
+  type: text
+  answer_from_var: setting

@@ -1,0 +1,19 @@
+category: performance
+image: single-node
+curriculum: https://www.opsschool.org/capacity_planning.html
+alerts:
+  - "ShopLatency: p99 latency above 250ms for 5m"
+summary: >
+  The whole shop is slow: pages that usually take milliseconds sometimes take
+  seconds. CPU usage looks low. The order backlog from yesterday's incident
+  was being cleared this morning.
+randomize:
+  concurrency:
+    choices: ["16", "17"]
+fix_verification:
+  restart: [shop-worker.service, shop.service]
+  reboot: false
+  load_replay: 120s
+mitigate_hold: 60s
+time_limit: 45m
+target_time: 25m

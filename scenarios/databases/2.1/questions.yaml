@@ -1,0 +1,13 @@
+- id: plan
+  prompt: What did EXPLAIN show for the order history query before the fix?
+  type: choice
+  choices:
+    - A full table scan and a filesort
+    - A lock wait
+    - A range scan on the primary key
+    - An index-only scan
+  answer: 0
+- id: migration
+  prompt: What was the timestamp prefix of the migration that dropped the index (for example 20261002_0915)?
+  type: text
+  answer_from_var: migration

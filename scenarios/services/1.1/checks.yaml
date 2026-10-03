@@ -1,0 +1,17 @@
+mitigated:
+  - name: health endpoint is up
+    type: http
+    url: http://{{vm}}/health
+    expect_status: 200
+  - name: error rate under 1%
+    type: promql
+    expr: >
+      (sum(rate(http_requests_total{code=~"5.."}[1m])) or vector(0))
+      / sum(rate(http_requests_total[1m])) < 0.01
+fixed:
+  - name: shop.env is valid
+    type: script
+    run: checks/config_ok.sh
+  - name: shop and worker run from shop.env
+    type: script
+    run: checks/units_ok.sh

@@ -1,0 +1,29 @@
+mitigated:
+  - name: p99 latency under 250ms
+    type: promql
+    expr: >
+      histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket[1m]))) < 0.25
+  - name: error rate under 1%
+    type: promql
+    expr: >
+      (sum(rate(http_requests_total{code=~"5.."}[1m])) or vector(0))
+      / sum(rate(http_requests_total[1m])) < 0.01
+fixed:
+  - name: the order worker is running
+    type: script
+    run: checks/worker_running.sh
+  - name: the order queue is drained
+    type: promql
+    expr: shop_worker_queue_depth < 50
+  - name: at least 20% of memory stayed available for the last 2 minutes
+    type: promql
+    expr: >
+      min_over_time((node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)[2m:15s]) > 0.2
+  - name: p99 latency stayed under 250ms for the last 2 minutes
+    type: promql
+    expr: >
+      max_over_time((histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket[30s]))))[2m:15s]) < 0.25
+preserve:
+  - name: no orders lost
+    type: script
+    run: checks/orders_preserved.sh

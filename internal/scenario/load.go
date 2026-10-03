@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -55,6 +56,8 @@ func load(dir string) (*Scenario, []Problem) {
 	if err := decodeFile(filepath.Join(dir, FileScenario), &s.Spec, true); err != nil {
 		add(FileScenario, "%s", err)
 	}
+	s.Spec.ID = IDOf(dir)
+	s.Spec.Level, _ = levelAndNumber(s.Spec.ID)
 	if s.Spec.MitigateHold.Duration == 0 {
 		s.Spec.MitigateHold.Duration = DefaultMitigateHoldSeconds * time.Second
 	}
@@ -140,7 +143,7 @@ func FindDirs(root string) ([]string, error) {
 }
 
 // LoadAll loads every scenario under root, sorted by category order, level
-// and ID. Scenarios that fail to load are returned as errors.
+// and number. Scenarios that fail to load are returned as errors.
 func LoadAll(root string) ([]*Scenario, []error) {
 	dirs, err := FindDirs(root)
 	if err != nil {
@@ -161,8 +164,13 @@ func LoadAll(root string) ([]*Scenario, []error) {
 		if ca, cb := categoryIndex(a.Category), categoryIndex(b.Category); ca != cb {
 			return ca < cb
 		}
-		if a.Level != b.Level {
-			return a.Level < b.Level
+		la, na := levelAndNumber(a.ID)
+		lb, nb := levelAndNumber(b.ID)
+		if la != lb {
+			return la < lb
+		}
+		if na != nb {
+			return na < nb
 		}
 		return a.ID < b.ID
 	})
@@ -176,11 +184,31 @@ func Find(root, id string) (*Scenario, error) {
 		return nil, err
 	}
 	for _, d := range dirs {
-		if filepath.Base(d) == id {
+		if IDOf(d) == id {
 			return Load(d)
 		}
 	}
 	return nil, fmt.Errorf("no scenario %q under %s (run `opsschool list`)", id, root)
+}
+
+// IDOf returns the ID of the scenario in dir, "<category>/<level>.<n>",
+// from the last two path elements.
+func IDOf(dir string) string {
+	return filepath.Base(filepath.Dir(dir)) + "/" + filepath.Base(dir)
+}
+
+var levelNumber = regexp.MustCompile(`/([1-4])\.([1-9][0-9]*)$`)
+
+// levelAndNumber parses the "<level>.<n>" part of an ID. It returns zeros
+// when the ID doesn't have one.
+func levelAndNumber(id string) (level, n int) {
+	m := levelNumber.FindStringSubmatch(id)
+	if m == nil {
+		return 0, 0
+	}
+	level, _ = strconv.Atoi(m[1])
+	n, _ = strconv.Atoi(m[2])
+	return level, n
 }
 
 func categoryIndex(c string) int {

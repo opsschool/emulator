@@ -10,7 +10,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"github.com/opsschool/simulator/demoapp/internal/metrics"
+	"github.com/opsschool/emulator/demoapp/internal/metrics"
 )
 
 // Cache wraps a Redis client.

@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Issues a server certificate from the internal CA and installs it for
+# nginx as the leaf followed by the intermediate.
+#   shop-cert-issue <hostname> [days]
+set -euo pipefail
+host=${1:?usage: shop-cert-issue <hostname> [days]}
+days=${2:-397}
+ca=/etc/ssl/shop-ca
+dir=/etc/nginx/tls
+install -d -m 0755 "$dir"
+key="$dir/$host.key"
+[[ -f "$key" ]] || (umask 077 && openssl genrsa -out "$key" 2048 2>/dev/null)
+csr=$(mktemp)
+leaf=$(mktemp)
+trap 'rm -f "$csr" "$leaf"' EXIT
+openssl req -new -key "$key" -subj "/CN=$host" -out "$csr"
+openssl x509 -req -in "$csr" -CA "$ca/intermediate.crt" -CAkey "$ca/intermediate.key" \
+  -CAcreateserial -out "$leaf" -days "$days" \
+  -extfile <(printf 'subjectAltName=DNS:%s\nextendedKeyUsage=serverAuth\nkeyUsage=critical,digitalSignature,keyEncipherment\n' "$host") 2>/dev/null
+cat "$leaf" "$ca/intermediate.crt" >"$dir/$host.crt"
+echo "issued $dir/$host.crt, valid $days days"

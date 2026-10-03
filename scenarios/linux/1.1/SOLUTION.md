@@ -25,5 +25,5 @@ file open; see `lsof +L1`. Restart MySQL if it does not recover on its own.
 
 ## Curriculum
 
-- [Filesystems 101](https://ops-school.readthedocs.io/en/latest/filesystems_101.html)
-- [Logs 101](https://ops-school.readthedocs.io/en/latest/logs_101.html)
+- [Filesystems 101](https://www.opsschool.org/filesystems_101.html)
+- [Logs 101](https://www.opsschool.org/logs_101.html)

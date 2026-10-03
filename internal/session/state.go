@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/opsschool/simulator/internal/results"
+	"github.com/opsschool/emulator/internal/results"
 )
 
 // State is the persisted state of the running session.
@@ -24,9 +24,11 @@ type State struct {
 	Image       string            `json:"image"`
 	Seed        uint64            `json:"seed"`
 	Vars        map[string]string `json:"vars"`
-	StartedAt   time.Time         `json:"started_at"`
-	TimeLimit   time.Duration     `json:"time_limit"`
-	TargetTime  time.Duration     `json:"target_time"`
+	// StartedAt is when the scenario began: the break is applied and the
+	// clock runs. Zero during the healthy baseline before it.
+	StartedAt  time.Time     `json:"started_at"`
+	TimeLimit  time.Duration `json:"time_limit"`
+	TargetTime time.Duration `json:"target_time"`
 	// TierPassed maps a tier to when it passed.
 	TierPassed map[string]time.Time `json:"tier_passed"`
 	HintsUsed  int                  `json:"hints_used"`
@@ -43,8 +45,14 @@ type Event struct {
 	Msg string    `json:"msg"`
 }
 
-// Elapsed returns the time since the session started.
+// Begun reports whether the scenario has begun.
+func (s *State) Begun() bool { return !s.StartedAt.IsZero() }
+
+// Elapsed returns the time since the scenario began.
 func (s *State) Elapsed(now time.Time) time.Duration {
+	if !s.Begun() {
+		return 0
+	}
 	return now.Sub(s.StartedAt).Truncate(time.Second)
 }
 
@@ -53,7 +61,7 @@ func (s *State) Passed(tier string) bool { _, ok := s.TierPassed[tier]; return o
 
 // OverTime reports whether the time limit has run out.
 func (s *State) OverTime(now time.Time) bool {
-	return s.TimeLimit > 0 && now.Sub(s.StartedAt) > s.TimeLimit
+	return s.Begun() && s.TimeLimit > 0 && now.Sub(s.StartedAt) > s.TimeLimit
 }
 
 // Result converts the state into a result record.
@@ -77,7 +85,7 @@ func Dir(home string) string { return filepath.Join(home, "session") }
 func statePath(home string) string { return filepath.Join(Dir(home), "state.json") }
 
 // ErrNoSession means no session is running.
-var ErrNoSession = errors.New("no scenario is running; start one with `opsschool start <id> --user <name>`")
+var ErrNoSession = errors.New("no scenario is running; start one with `opsschool start <category>/<level>.<n> --user <name>` (see `opsschool list`)")
 
 // Load reads the session state.
 func Load(home string) (*State, error) {

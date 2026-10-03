@@ -13,8 +13,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/opsschool/simulator/demoapp/internal/faults"
-	"github.com/opsschool/simulator/demoapp/internal/metrics"
+	"github.com/opsschool/emulator/demoapp/internal/faults"
+	"github.com/opsschool/emulator/demoapp/internal/metrics"
 )
 
 // ErrDeclined is returned when the payment is declined. It is not retried.

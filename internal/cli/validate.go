@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/opsschool/simulator/internal/scenario"
+	"github.com/opsschool/emulator/internal/scenario"
 )
 
 func init() {

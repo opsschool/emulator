@@ -1,4 +1,4 @@
-module github.com/opsschool/simulator
+module github.com/opsschool/emulator
 
 go 1.27.0
 

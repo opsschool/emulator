@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/opsschool/simulator/internal/checks"
-	"github.com/opsschool/simulator/internal/loadgen"
-	"github.com/opsschool/simulator/internal/scenario"
-	"github.com/opsschool/simulator/internal/telemetry"
-	"github.com/opsschool/simulator/internal/vm"
+	"github.com/opsschool/emulator/internal/checks"
+	"github.com/opsschool/emulator/internal/loadgen"
+	"github.com/opsschool/emulator/internal/scenario"
+	"github.com/opsschool/emulator/internal/telemetry"
+	"github.com/opsschool/emulator/internal/vm"
 )
 
 // Env holds what a session needs from the host.
@@ -93,7 +93,7 @@ func (e *Env) Bring(ctx context.Context, s *scenario.Scenario) error {
 	if err != nil {
 		return err
 	}
-	dash, err := telemetry.Dashboard(s.Spec.ID, s.Spec.Title, s.Dashboard)
+	dash, err := telemetry.Dashboard(s.Spec.ID, s.Dashboard)
 	if err != nil {
 		return err
 	}
@@ -102,16 +102,37 @@ func (e *Env) Bring(ctx context.Context, s *scenario.Scenario) error {
 			return err
 		}
 	}
+	// Boot first, so the dashboards start with a running machine rather
+	// than its boot, which would skew the first minutes of every rate().
+	e.Say("Booting the scenario machine")
+	if err := e.Machine.Create(ctx, s.Spec.Image); err != nil {
+		return err
+	}
+	if _, err := e.Machine.Run(ctx, settleScript, nil); err != nil {
+		return err
+	}
 	e.Say("Starting telemetry (Prometheus, Loki, Grafana)")
 	if err := stack.Render(dash); err != nil {
 		return err
 	}
-	if err := stack.Up(ctx); err != nil {
-		return err
-	}
-	e.Say("Booting the scenario machine")
-	return e.Machine.Create(ctx, s.Spec.Image)
+	return stack.Up(ctx)
 }
+
+// settleScript waits until the machine's CPUs are at least 80% idle over
+// five seconds (iowait counts as busy), for at most 90 seconds: the end of
+// boot warms caches for a while after systemd reports it is up.
+const settleScript = `
+for _ in $(seq 18); do
+  read -r _ u n s i w q sq st _ </proc/stat
+  sleep 5
+  read -r _ u2 n2 s2 i2 w2 q2 sq2 st2 _ </proc/stat
+  total=$(( (u2+n2+s2+i2+w2+q2+sq2+st2) - (u+n+s+i+w+q+sq+st) ))
+  if (( total > 0 && (i2 - i) * 100 / total >= 80 )); then exit 0; fi
+done`
+
+// Baseline is how long a session runs healthy, with load and telemetry,
+// before the break: the dashboards show normal behavior to compare against.
+const Baseline = 2 * time.Minute
 
 // RunScript copies one of the scenario's scripts into the machine, runs it
 // as root with the session environment, and removes it.

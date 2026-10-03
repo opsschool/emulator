@@ -33,12 +33,14 @@ var LoadProfiles = []string{"steady", "peak"}
 
 // Spec is the contents of scenario.yaml.
 type Spec struct {
-	ID              string          `yaml:"id"`
-	Title           string          `yaml:"title"`
+	// ID is "<category>/<level>.<n>" and Level is its level, both taken
+	// from the directory, not the file.
+	ID              string          `yaml:"-"`
+	Level           int             `yaml:"-"`
 	Category        string          `yaml:"category"`
-	Level           int             `yaml:"level"`
 	Image           string          `yaml:"image"`
 	Curriculum      string          `yaml:"curriculum"`
+	Alerts          []string        `yaml:"alerts"`
 	Summary         string          `yaml:"summary"`
 	Randomize       map[string]Var  `yaml:"randomize"`
 	FixVerification FixVerification `yaml:"fix_verification"`

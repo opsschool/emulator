@@ -9,10 +9,10 @@ mitigated:
       (sum(rate(http_requests_total{route="POST /orders",code=~"5.."}[1m])) or vector(0))
       / sum(rate(http_requests_total{route="POST /orders"}[1m])) < 0.01
 fixed:
-  - name: log level is not debug
+  - name: log volume is back to normal
     type: script
     run: checks/log_level_ok.sh
-  - name: shop logs are rotated
+  - name: old shop logs are cleaned up automatically
     type: script
     run: checks/logrotate_ok.sh
   - name: free space on /data is not trending to zero

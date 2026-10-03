@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/opsschool/simulator/internal/checks"
-	"github.com/opsschool/simulator/internal/loadgen"
-	"github.com/opsschool/simulator/internal/results"
-	"github.com/opsschool/simulator/internal/scenario"
-	"github.com/opsschool/simulator/internal/vm"
+	"github.com/opsschool/emulator/internal/checks"
+	"github.com/opsschool/emulator/internal/loadgen"
+	"github.com/opsschool/emulator/internal/results"
+	"github.com/opsschool/emulator/internal/scenario"
+	"github.com/opsschool/emulator/internal/vm"
 )
 
 // fakeMachine records scripts and answers every Run with exit code 0.
@@ -62,7 +62,7 @@ func TestDaemonAPI(t *testing.T) {
 	s.Spec.FixVerification.Restart = []string{"shop.service"}
 
 	home := t.TempDir()
-	st := &State{User: "jdoe", ScenarioID: "linux-test", StartedAt: time.Now(), TimeLimit: time.Hour}
+	st := &State{User: "jdoe", ScenarioID: "linux-test", TimeLimit: time.Hour}
 	if err := Save(home, st); err != nil {
 		t.Fatal(err)
 	}
@@ -84,11 +84,6 @@ func TestDaemonAPI(t *testing.T) {
 	ln.Start()
 	defer ln.Close()
 
-	d.tick(ctx) // hold is 0, so one passing tick passes mitigated
-	if !d.st.Passed(results.TierMitigated) {
-		t.Fatal("mitigated should have passed")
-	}
-
 	post := func(path string) string {
 		resp, err := http.Post(ln.URL+path, "application/json", nil)
 		if err != nil {
@@ -97,6 +92,24 @@ func TestDaemonAPI(t *testing.T) {
 		defer resp.Body.Close()
 		b, _ := io.ReadAll(resp.Body)
 		return string(b)
+	}
+
+	// Before the scenario begins nothing is graded and hints are refused.
+	d.tick(ctx)
+	if d.st.Passed(results.TierMitigated) || d.st.Elapsed(time.Now()) != 0 {
+		t.Fatal("graded before the scenario began")
+	}
+	if h := post("/hint"); !strings.Contains(h, "not begun") {
+		t.Errorf("hint before begin: %s", h)
+	}
+	post("/begin")
+	if !d.st.Begun() {
+		t.Fatal("/begin did not start the scenario")
+	}
+
+	d.tick(ctx) // hold is 0, so one passing tick passes mitigated
+	if !d.st.Passed(results.TierMitigated) {
+		t.Fatal("mitigated should have passed")
 	}
 	if h := post("/hint"); !strings.Contains(h, "look at df") {
 		t.Errorf("first hint: %s", h)
@@ -123,5 +136,54 @@ func TestDaemonAPI(t *testing.T) {
 	rs, _ := results.Open(home).All()
 	if len(rs) != 1 || rs[0].HintsUsed != 2 {
 		t.Errorf("results: %+v", rs)
+	}
+}
+
+// Learners see which checks failed, not their output, which can name the cause.
+func TestVerifyReportHidesDetails(t *testing.T) {
+	var r VerifyReport
+	r.fail("fixed: the cause is fixed", "no cron job cleans up /data/sessions")
+	if strings.Contains(strings.Join(r.Failures, ""), "cron") {
+		t.Errorf("failures leak the detail: %q", r.Failures)
+	}
+	if !strings.Contains(strings.Join(r.Details, ""), "cron") {
+		t.Errorf("details lost: %q", r.Details)
+	}
+}
+
+func TestVerifyKeepsMitigatedHold(t *testing.T) {
+	s := &scenario.Scenario{Spec: scenario.Spec{ID: "linux-test"}}
+	s.Spec.MitigateHold.Duration = time.Minute
+	newDaemon := func(since time.Time) *Daemon {
+		d := &Daemon{Home: t.TempDir(), Log: log.New(io.Discard, "", 0), Scenario: s, since: since}
+		d.st = &State{ScenarioID: "linux-test", StartedAt: since.Add(-time.Minute)}
+		d.setupMetrics()
+		return d
+	}
+	now := time.Now()
+	since := now.Add(-90 * time.Second)
+
+	// Fix not verified, but the service stayed mitigated: the hold carries on.
+	d := newDaemon(since)
+	d.finishVerify(&VerifyReport{MitigatedPass: true}, now)
+	if !d.since.Equal(since) {
+		t.Errorf("hold restarted after a verification that stayed mitigated")
+	}
+
+	// Mitigated checks failed at the end of verification: the hold restarts.
+	d = newDaemon(since)
+	d.finishVerify(&VerifyReport{}, now)
+	if !d.since.IsZero() {
+		t.Errorf("hold kept after mitigated checks failed")
+	}
+
+	// A passing verification credits mitigated when the hold completed.
+	d = newDaemon(since)
+	d.finishVerify(&VerifyReport{Pass: true, MitigatedPass: true}, now)
+	if got, want := d.st.TierPassed[results.TierMitigated], since.Add(time.Minute); !got.Equal(want) {
+		t.Errorf("mitigated passed at %s, want %s", got, want)
+	}
+	if got := d.st.TierPassed[results.TierFixed]; !got.Equal(now) {
+		t.Errorf("fixed passed at %s, want %s", got, now)
 	}
 }

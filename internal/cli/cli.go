@@ -95,6 +95,19 @@ func newFlags(e *Env, name string) *flag.FlagSet {
 	return fs
 }
 
+// noArgs is for commands without flags or arguments: it handles -h and
+// refuses anything else, so `opsschool stop -h` doesn't end the session.
+func noArgs(e *Env, name string, args []string) error {
+	fs := newFlags(e, name)
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() > 0 {
+		return errUsage
+	}
+	return nil
+}
+
 // scenariosRoot finds the scenarios directory: the flag value, then
 // $OPSSCHOOL_SCENARIOS, then ./scenarios or the nearest parent that has one.
 func scenariosRoot(e *Env, flagVal string) (string, error) {
@@ -117,7 +130,7 @@ func scenariosRoot(e *Env, flagVal string) (string, error) {
 			break
 		}
 	}
-	return "", errors.New("no scenarios directory found; run from the simulator repo or set OPSSCHOOL_SCENARIOS")
+	return "", errors.New("no scenarios directory found; run from the emulator repo or set OPSSCHOOL_SCENARIOS")
 }
 
 // Home returns the opsschool state directory, $OPSSCHOOL_HOME or ~/.opsschool.
@@ -134,4 +147,25 @@ func Home(e *Env) (string, error) {
 
 func indent(s, prefix string) string {
 	return prefix + strings.ReplaceAll(strings.TrimRight(s, "\n"), "\n", "\n"+prefix)
+}
+
+// wrap breaks each line of s at spaces so no line is longer than width,
+// unless a single word is.
+func wrap(s string, width int) string {
+	var out []string
+	for _, line := range strings.Split(s, "\n") {
+		cur := ""
+		for _, w := range strings.Fields(line) {
+			if cur != "" && len(cur)+1+len(w) > width {
+				out = append(out, cur)
+				cur = ""
+			}
+			if cur != "" {
+				cur += " "
+			}
+			cur += w
+		}
+		out = append(out, cur)
+	}
+	return strings.Join(out, "\n")
 }

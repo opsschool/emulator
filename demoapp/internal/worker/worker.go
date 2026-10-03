@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/opsschool/simulator/demoapp/internal/metrics"
-	"github.com/opsschool/simulator/demoapp/internal/store"
+	"github.com/opsschool/emulator/demoapp/internal/metrics"
+	"github.com/opsschool/emulator/demoapp/internal/store"
 )
 
 // Worker polls the order queue with a fixed number of goroutines.

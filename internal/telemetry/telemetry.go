@@ -16,7 +16,7 @@ import (
 	"text/template"
 	"time"
 
-	telemetryfs "github.com/opsschool/simulator/telemetry"
+	telemetryfs "github.com/opsschool/emulator/telemetry"
 )
 
 // Host ports. The VM ports are forwarded by Lima (images/*/lima.yaml).
@@ -57,9 +57,10 @@ type renderedTarget struct{ Job, Instance, Addr string }
 // Stack is a rendered telemetry stack in a directory.
 type Stack struct {
 	Dir string
-	// HostNetwork runs the containers on the host network. Needed on Linux,
-	// where containers can't reach ports Lima forwards to 127.0.0.1. Docker
-	// Desktop (macOS, Windows) reaches them through host.docker.internal.
+	// HostNetwork runs the containers on the host network. Needed with
+	// Docker Engine on Linux, where containers can't reach ports Lima
+	// forwards to 127.0.0.1. Docker Desktop (macOS, Windows, WSL2) reaches
+	// them through host.docker.internal.
 	HostNetwork bool
 	// Network, when set, is an existing Docker network the stack joins to
 	// reach the machine directly (the container driver). CLIHost is the
@@ -74,7 +75,23 @@ func (s *Stack) UseNetwork(network, cliHost string) {
 }
 
 // NewStack returns a stack for this platform.
-func NewStack(dir string) *Stack { return &Stack{Dir: dir, HostNetwork: runtime.GOOS == "linux"} }
+func NewStack(dir string) *Stack { return &Stack{Dir: dir, HostNetwork: hostNetworkShared()} }
+
+// hostNetworkShared reports whether containers on Docker's host network
+// share this machine's loopback. That holds for Docker Engine on Linux but
+// not for Docker Desktop, whose host network is its own VM even when the
+// CLI runs on Linux or in WSL2.
+func hostNetworkShared() bool {
+	if runtime.GOOS != "linux" {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "docker", "info", "--format", "{{.OperatingSystem}}").Output()
+	// If Docker doesn't answer, starting the stack fails later with a
+	// clearer error than this would give.
+	return err != nil || !strings.Contains(string(out), "Docker Desktop")
+}
 
 // URLs the host uses to reach the stack.
 func PrometheusURL() string { return fmt.Sprintf("http://127.0.0.1:%d", PrometheusPort) }

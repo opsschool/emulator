@@ -1,0 +1,18 @@
+- id: chain
+  prompt: What was wrong with the API's certificate?
+  type: choice
+  choices:
+    - It had expired
+    - It was for the wrong hostname
+    - The server sent it without the intermediate CA certificate
+    - It was self-signed
+  answer: 2
+- id: browsers
+  prompt: Why did browsers keep working?
+  type: choice
+  choices:
+    - Browsers ignore certificate errors
+    - Browsers cache intermediates and can fetch missing ones (AIA)
+    - Browsers used plain HTTP
+    - Browsers have the shop's root CA built in
+  answer: 1

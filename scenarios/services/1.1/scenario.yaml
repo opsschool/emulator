@@ -1,0 +1,19 @@
+category: services
+image: single-node
+curriculum: https://www.opsschool.org/troubleshooting_101.html
+alerts:
+  - "ShopHealthCheckFailing: /health through the load balancer has failed for 2m"
+  - "ShopErrorRate: more than 5% of requests are failing (5xx)"
+summary: >
+  The shop is down. Every page returns 502 Bad Gateway. A routine
+  configuration change was rolled out a few minutes before the first alert.
+randomize:
+  setting:
+    choices: [SHOP_DB_POOL_SIZE, SHOP_CACHE_TTL, SHOP_CLIENT_KEEPALIVE, SHOP_DB_QUERY_TIMEOUT]
+fix_verification:
+  restart: [shop.service, shop-worker.service]
+  reboot: false
+  load_replay: 60s
+mitigate_hold: 60s
+time_limit: 30m
+target_time: 10m

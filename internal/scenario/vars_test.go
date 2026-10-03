@@ -34,8 +34,8 @@ func TestResolveVarsDeterministic(t *testing.T) {
 }
 
 func TestEnv(t *testing.T) {
-	got := Env("linux-disk-full", "jdoe", 7, map[string]string{"log_name": "debug.log"})
-	want := []string{"OPSSCHOOL_SCENARIO=linux-disk-full", "OPSSCHOOL_USER=jdoe", "OPSSCHOOL_SEED=7", "OPSSCHOOL_VAR_LOG_NAME=debug.log"}
+	got := Env("linux/1.1", "jdoe", 7, map[string]string{"log_name": "debug.log"})
+	want := []string{"OPSSCHOOL_SCENARIO=linux/1.1", "OPSSCHOOL_USER=jdoe", "OPSSCHOOL_SEED=7", "OPSSCHOOL_VAR_LOG_NAME=debug.log"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("got %v", got)
 	}

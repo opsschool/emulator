@@ -6,19 +6,29 @@ import (
 	"strings"
 	"time"
 
-	"github.com/opsschool/simulator/internal/checks"
-	"github.com/opsschool/simulator/internal/loadgen"
-	"github.com/opsschool/simulator/internal/scenario"
-	"github.com/opsschool/simulator/internal/vm"
+	"github.com/opsschool/emulator/internal/checks"
+	"github.com/opsschool/emulator/internal/loadgen"
+	"github.com/opsschool/emulator/internal/scenario"
+	"github.com/opsschool/emulator/internal/vm"
 )
 
 // VerifyReport is the outcome of fix verification.
 type VerifyReport struct {
-	At       time.Time     `json:"at"`
-	Pass     bool          `json:"pass"`
-	DataLoss bool          `json:"data_loss"`
+	At       time.Time `json:"at"`
+	Pass     bool      `json:"pass"`
+	DataLoss bool      `json:"data_loss"`
+	// MitigatedPass is whether the mitigated checks passed at the end.
+	MitigatedPass bool `json:"mitigated_pass"`
+	// Failures name what failed, for the learner. Details add each check's
+	// output, which can give the cause away, for scenario authors.
 	Failures []string      `json:"failures,omitempty"`
+	Details  []string      `json:"details,omitempty"`
 	Duration time.Duration `json:"duration"`
+}
+
+func (r *VerifyReport) fail(failure, detail string) {
+	r.Failures = append(r.Failures, failure)
+	r.Details = append(r.Details, failure+" ("+detail+")")
 }
 
 // Verifier runs fix verification: restart the scenario's units, reboot if
@@ -51,13 +61,13 @@ func (v *Verifier) Run(ctx context.Context, say func(string)) (VerifyReport, err
 			return rep, err
 		}
 		if res.ExitCode != 0 {
-			rep.Failures = append(rep.Failures, "restart failed: "+strings.TrimSpace(res.Stderr))
+			rep.fail("restart failed", strings.TrimSpace(res.Stderr))
 		}
 	}
 	if fv.Reboot {
 		say("Rebooting the machine")
 		if err := v.Machine.Reboot(ctx); err != nil {
-			rep.Failures = append(rep.Failures, "reboot: "+err.Error())
+			rep.fail("reboot failed", err.Error())
 		}
 	}
 	if d := fv.LoadReplay.Duration; d > 0 && v.Load != nil {
@@ -88,10 +98,13 @@ func (v *Verifier) Run(ctx context.Context, say func(string)) (VerifyReport, err
 		{"preserve", v.Scenario.Checks.Preserve},
 	}
 	for _, g := range groups {
-		_, outs := v.Engine.EvaluateAll(ctx, g.cs, checks.PhaseCheck)
+		ok, outs := v.Engine.EvaluateAll(ctx, g.cs, checks.PhaseCheck)
+		if g.name == "mitigated" {
+			rep.MitigatedPass = ok
+		}
 		for _, o := range outs {
 			if !o.Pass {
-				rep.Failures = append(rep.Failures, fmt.Sprintf("%s: %s (%s)", g.name, o.Check.Label(), o.Detail))
+				rep.fail(g.name+": "+o.Check.Label(), o.Detail)
 				if g.name == "preserve" {
 					rep.DataLoss = true
 				}

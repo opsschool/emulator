@@ -1,0 +1,13 @@
+- id: variant
+  prompt: Which happened in your session (deleted-log or inodes)?
+  type: text
+  answer_from_var: variant
+- id: df-du
+  prompt: Why can df show a filesystem as full when du finds little on it?
+  type: choice
+  choices:
+    - du doesn't count hidden files
+    - A deleted file is still held open by a process, so its blocks aren't freed
+    - df rounds up
+    - The filesystem is corrupted
+  answer: 1

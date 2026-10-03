@@ -1,0 +1,18 @@
+mitigated:
+  - name: health endpoint is up
+    type: http
+    url: http://{{vm}}/health
+    expect_status: 200
+  - name: order error rate under 1%
+    type: promql
+    expr: >
+      (sum(rate(http_requests_total{route="POST /orders",code=~"5.."}[1m])) or vector(0))
+      / sum(rate(http_requests_total{route="POST /orders"}[1m])) < 0.01
+fixed:
+  - name: the cause is fixed
+    type: script
+    run: checks/cause_fixed.sh
+preserve:
+  - name: no orders lost
+    type: script
+    run: checks/orders_preserved.sh

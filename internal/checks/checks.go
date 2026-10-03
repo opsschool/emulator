@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/opsschool/simulator/internal/scenario"
-	"github.com/opsschool/simulator/internal/vm"
+	"github.com/opsschool/emulator/internal/scenario"
+	"github.com/opsschool/emulator/internal/vm"
 )
 
 // StateDir is where script checks keep state inside the machine.

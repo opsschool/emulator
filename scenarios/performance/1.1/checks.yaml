@@ -1,0 +1,18 @@
+mitigated:
+  - name: p99 latency under 80ms
+    type: promql
+    expr: >
+      histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket[1m]))) < 0.08
+  - name: error rate under 1%
+    type: promql
+    expr: >
+      (sum(rate(http_requests_total{code=~"5.."}[1m])) or vector(0))
+      / sum(rate(http_requests_total[1m])) < 0.01
+fixed:
+  - name: cron is running
+    type: script
+    run: checks/cron_running.sh
+  - name: p99 latency stayed under 80ms for the last 3 minutes
+    type: promql
+    expr: >
+      max_over_time((histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket[30s]))))[3m:15s]) < 0.08

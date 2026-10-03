@@ -28,6 +28,17 @@ check "process-exporter" curl -fsS http://127.0.0.1:9256/metrics
 check "mysqld_exporter up" bash -c 'curl -fsS http://127.0.0.1:9104/metrics | grep -q "^mysql_up 1"'
 check "redis_exporter up" bash -c 'curl -fsS http://127.0.0.1:9121/metrics | grep -q "^redis_up 1"'
 check "/data mounted" mountpoint -q /data
+check "payments resolves" getent hosts payments.shop.internal
+check "https api, full chain" curl -fsS --resolve api.shop.internal:443:127.0.0.1 https://api.shop.internal/health
+check "https partners, full chain" curl -fsS --resolve partners.shop.internal:443:127.0.0.1 https://partners.shop.internal/health
+check "persisted firewall" test -s /etc/iptables/rules.v4
+if [[ $(systemd-detect-virt --container || true) == none ]]; then
+  check "swap on" bash -c '[[ -n $(swapon --noheadings) ]]'
+  check "unit dnsmasq active" systemctl is-active --quiet dnsmasq
+  # shellcheck disable=SC2016 # expanded by the inner bash
+  # Since dnsmasq last started: provisioning starts it once with stock defaults.
+  check "no dns warnings from dnsmasq" bash -c '[[ -z $(journalctl -q -p warning -t dnsmasq -t resolvconf --since "$(systemctl show -P InactiveExitTimestamp dnsmasq)") ]]'
+fi
 # shellcheck disable=SC2016 # expanded by the inner bash
 check "orders seeded" bash -c '(( $(mysql -N -B shop -e "SELECT COUNT(*) FROM orders") > 1000 ))'
 exit $fail

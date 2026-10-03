@@ -12,7 +12,7 @@ import (
 
 	"github.com/go-sql-driver/mysql"
 
-	"github.com/opsschool/simulator/demoapp/internal/faults"
+	"github.com/opsschool/emulator/demoapp/internal/faults"
 )
 
 //go:embed schema.sql

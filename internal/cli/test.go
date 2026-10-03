@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/opsschool/simulator/internal/scenario"
-	"github.com/opsschool/simulator/internal/session"
-	"github.com/opsschool/simulator/internal/vm"
+	"github.com/opsschool/emulator/internal/scenario"
+	"github.com/opsschool/emulator/internal/session"
+	"github.com/opsschool/emulator/internal/vm"
 )
 
 func init() {
@@ -104,7 +104,7 @@ func runImage(e *Env, args []string) error {
 	}
 }
 
-// repoRoot finds the simulator repository: the parent of the scenarios
+// repoRoot finds the emulator repository: the parent of the scenarios
 // directory.
 func repoRoot(e *Env) (string, error) {
 	sc, err := scenariosRoot(e, "")

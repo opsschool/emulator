@@ -1,0 +1,13 @@
+- id: path
+  prompt: Which traffic did the new rule block?
+  type: choice
+  choices:
+    - SSH from the internet
+    - nginx connecting to the app over loopback
+    - The app connecting to MySQL
+    - DNS lookups
+  answer: 1
+- id: action
+  prompt: What target did the bad rule use (DROP or REJECT)?
+  type: text
+  answer_from_var: action

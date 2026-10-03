@@ -1,10 +1,10 @@
-# Ops School Simulator: Design and Build Spec
+# Ops School Emulator: Design and Build Spec
 
-This is the build spec for the Ops School simulator. It is written for Claude Code (or any engineer) to implement from. Changes made after the original spec are recorded in [decisions.md](decisions.md). The curriculum it supports lives at <https://ops-school.readthedocs.io>.
+This is the build spec for the Ops School emulator. It is written for Claude Code (or any engineer) to implement from. Changes made after the original spec are recorded in [decisions.md](decisions.md). The curriculum it supports lives at <https://ops-school.readthedocs.io>.
 
 ## Instructions for Claude Code
 
-1. Confirm with the user: repo name (suggested `opsschool/simulator`), visibility (suggested public), and license. Then create the repo in the `opsschool` GitHub org with `gh repo create`.
+1. Confirm with the user: repo name (suggested `opsschool/emulator`), visibility (suggested public), and license. Then create the repo in the `opsschool` GitHub org with `gh repo create`.
 2. Commit this file as `docs/design.md`.
 3. Write a short `CLAUDE.md` at the repo root with the conventions from the "Conventions" section and a pointer to `docs/design.md`.
 4. Work through the milestones in order. Each milestone has acceptance criteria. Stop for user review after M0 and after M3.
@@ -12,12 +12,12 @@ This is the build spec for the Ops School simulator. It is written for Claude Co
 
 ## Goal
 
-Learners start a simulated production environment in a broken state, debug it with real tools, and get graded as they go. The first audience is people learning to be SREs. The second is software engineers learning to run their own services.
+Learners start an emulated production environment in a broken state, debug it with real tools, and get graded as they go. The first audience is people learning to be SREs. The second is software engineers learning to run their own services.
 
 A learner runs something like:
 
 ```
-opsschool start linux-disk-full --user jdoe
+opsschool start linux/1.1 --user jdoe
 ```
 
 They get a shell on a VM, a Grafana URL with live dashboards, and notifications as they pass each grading tier.
@@ -101,7 +101,7 @@ images/single-node/     Lima template + provisioning for the single-node image
 images/multi-node/      (M5) multi-node image
 telemetry/              docker-compose.yml, Prometheus/Loki/Grafana config
 telemetry/dashboards/   base dashboard JSON
-scenarios/<category>/<id>/
+scenarios/<category>/<level>.<n>/   e.g. scenarios/linux/1.1/
 docs/design.md          this file
 docs/decisions.md
 docs/writing-scenarios.md
@@ -113,7 +113,7 @@ CONTRIBUTING.md
 
 | Command | Behavior |
 | --- | --- |
-| `opsschool list` | List scenarios with category, level and the learner's best result. |
+| `opsschool list` | List scenario IDs and the learner's best result. |
 | `opsschool start <id> --user <name>` | Boot the VM, start the telemetry stack, apply the break, start load. Print the shell command and Grafana URL. Start the timer. |
 | `opsschool shell` | Open a shell in the running scenario VM. |
 | `opsschool status` | Show each tier's state, elapsed time and hints used. |
@@ -135,8 +135,8 @@ When a tier passes, the CLI prints a message, sends a desktop notification if av
 Each scenario is one directory:
 
 ```
-scenarios/networking/net-mtu-blackhole/
-  scenario.yaml     metadata, level, image, randomized vars
+scenarios/networking/4.1/
+  scenario.yaml     metadata, image, randomized vars
   break.sh          applies the fault; runs as root in the VM
   checks.yaml       checks per tier
   mitigate.sh       reference mitigation (CI only, never shown to learners)
@@ -150,12 +150,11 @@ scenarios/networking/net-mtu-blackhole/
 ### scenario.yaml
 
 ```yaml
-id: linux-disk-full
-title: Disk full
 category: linux            # linux | performance | networking | databases | services | distributed
-level: 1
 image: single-node         # single-node | multi-node
 curriculum: https://ops-school.readthedocs.io/   # link the specific chapter
+alerts:                    # optional; shown as [FIRING] lines when the scenario begins
+  - "ShopOrderErrors: more than 5% of POST /orders requests are failing (5xx)"
 summary: >
   Orders are failing. Customers report errors at checkout.
 randomize:
@@ -175,7 +174,8 @@ Rules:
 
 - `randomize` values are chosen once per session from a seed and passed to every script as environment variables named `OPSSCHOOL_VAR_<NAME>` (uppercased).
 - The session seed, username and scenario ID are passed as `OPSSCHOOL_SEED`, `OPSSCHOOL_USER` and `OPSSCHOOL_SCENARIO`.
-- The `summary` is the only text shown to the learner at start. It describes symptoms the way a page or a user report would, never the cause.
+- A scenario's ID is `<category>/<level>.<n>`, from its directory, for example `linux/1.1` or `databases/2.3`. The level (1 to 4) comes from the directory, not from scenario.yaml; `n` numbers the scenarios at that level from 1, and a new scenario takes the next free number. The ID says nothing else about the scenario, and scenarios have no title.
+- `alerts` and `summary` are the only text shown to the learner at start. Each alert is one line, printed as `[FIRING] <line>`, like a page from the alerting system; leave it out when nothing would fire and the incident arrives as a report. The `summary` is what people are reporting. Both describe symptoms, never the cause.
 
 ### checks.yaml
 
@@ -298,55 +298,55 @@ The bootstrap set is 24 scenarios, six categories with four levels each. MVP is 
 
 | ID | Level | Fault | Mitigate | Fix |
 | --- | --- | --- | --- | --- |
-| `linux-disk-full` | L1 | App log level set to debug; the log fills `/data`, which also holds the MySQL data directory. | Free space, service healthy. | Log level restored, logrotate configured, space trend flat. |
-| `linux-phantom-disk` | L2 | `df` shows free space but writes fail. Variant A: deleted log still held open by a process. Variant B: inode exhaustion from millions of session files. Variant chosen by seed. | Writes succeed. | Holder fixed or restarted with rotation that reopens files; for B, session cleanup job in place. |
-| `linux-fstab-boot` | L3 | New fstab entry for a data volume is wrong; the shop unit depends on the mount. Service fails after reboot. | Service up. | fstab and unit ordering correct; survives reboot. |
-| `linux-oom-layered` | L4 | Config management lowered the app's cgroup memory limit, a sidecar leaks memory, and `oom_score_adj` points the OOM killer at the app. | App stable for the hold period. | Limit corrected, sidecar leak fixed or contained, OOM priority corrected; survives load replay. |
+| `linux/1.1` | L1 | App log level set to debug; the log fills `/data`, which also holds the MySQL data directory. | Free space, service healthy. | Log level restored, logrotate configured, space trend flat. |
+| `linux/2.1` | L2 | `df` shows free space but writes fail. Variant A: deleted log still held open by a process. Variant B: inode exhaustion from millions of session files. Variant chosen by seed. | Writes succeed. | Holder fixed or restarted with rotation that reopens files; for B, session cleanup job in place. |
+| `linux/3.1` | L3 | New fstab entry for a data volume is wrong; the shop unit depends on the mount. Service fails after reboot. | Service up. | fstab and unit ordering correct; survives reboot. |
+| `linux/4.1` | L4 | Config management lowered the app's cgroup memory limit, a sidecar leaks memory, and `oom_score_adj` points the OOM killer at the app. | App stable for the hold period. | Limit corrected, sidecar leak fixed or contained, OOM priority corrected; survives load replay. |
 
 ### Performance
 
 | ID | Level | Fault | Mitigate | Fix |
 | --- | --- | --- | --- | --- |
-| `perf-cpu-cron` | L1 | A cron job runs a CPU-bound loop every minute. | Latency back under target. | Cron entry removed or fixed. |
-| `perf-swap-thrash` | L2 | Worker concurrency raised past available memory; the box swaps. | Latency back under target. | Concurrency right-sized; no swap-in under load replay. |
-| `perf-io-spikes` | L3 | A backup job every 10 minutes saturates disk I/O; p99 spikes while CPU looks normal. | Spikes stop. | Backup throttled (ionice, rate limit) or rescheduled; p99 stable across two backup cycles. |
-| `perf-pool-collapse` | L4 | DB pool too small for peak load; requests queue and time out, and client retries double the load. Only appears under peak. | Error rate under target at peak. | Pool sized correctly and retry policy uses backoff with a budget; survives peak replay. |
+| `performance/1.1` | L1 | A cron job runs a CPU-bound loop every minute. | Latency back under target. | Cron entry removed or fixed. |
+| `performance/2.1` | L2 | Worker concurrency raised past available memory; the box swaps. | Latency back under target. | Concurrency right-sized; no swap-in under load replay. |
+| `performance/3.1` | L3 | A backup job every 10 minutes saturates disk I/O; p99 spikes while CPU looks normal. | Spikes stop. | Backup throttled (ionice, rate limit) or rescheduled; p99 stable across two backup cycles. |
+| `performance/4.1` | L4 | DB pool too small for peak load; requests queue and time out, and client retries double the load. Only appears under peak. | Error rate under target at peak. | Pool sized correctly and retry policy uses backoff with a budget; survives peak replay. |
 
 ### Networking
 
 | ID | Level | Fault | Mitigate | Fix |
 | --- | --- | --- | --- | --- |
-| `net-dns` | L1 | `resolv.conf` points to a dead resolver after a simulated DHCP change. Outbound calls by hostname fail. | Resolution works. | Resolver config fixed at its source so it survives reboot. |
-| `net-iptables-port` | L2 | An iptables rule drops traffic to the app port from the proxy. SSH works. | Traffic flows. | Rule removed from the persisted firewall config; survives reboot. |
-| `net-ephemeral-ports` | L3 | App's outbound client has keepalive disabled; TIME\_WAIT sockets exhaust ephemeral ports under load. Variant: conntrack table full. | Errors stop. | Keepalive or pooling enabled; survives load replay. |
-| `net-mtu-blackhole` | L4 | A tunnel lowers the MTU and ICMP is filtered, so path MTU discovery fails. Small responses work, large ones hang. | Large responses complete. | MTU corrected or MSS clamped, and ICMP fragmentation-needed allowed. |
+| `networking/1.1` | L1 | `resolv.conf` points to a dead resolver after a simulated DHCP change. Outbound calls by hostname fail. | Resolution works. | Resolver config fixed at its source so it survives reboot. |
+| `networking/2.1` | L2 | An iptables rule drops traffic to the app port from the proxy. SSH works. | Traffic flows. | Rule removed from the persisted firewall config; survives reboot. |
+| `networking/3.1` | L3 | App's outbound client has keepalive disabled; TIME\_WAIT sockets exhaust ephemeral ports under load. Variant: conntrack table full. | Errors stop. | Keepalive or pooling enabled; survives load replay. |
+| `networking/4.1` | L4 | A tunnel lowers the MTU and ICMP is filtered, so path MTU discovery fails. Small responses work, large ones hang. | Large responses complete. | MTU corrected or MSS clamped, and ICMP fragmentation-needed allowed. |
 
 ### Databases (MySQL)
 
 | ID | Level | Fault | Mitigate | Fix |
 | --- | --- | --- | --- | --- |
-| `db-too-many-conns` | L1 | New app build leaks a connection on an error path until MySQL hits `max_connections` (ERROR 1040). Variant: disk full from binlogs with no expiry. | Connections available, errors stop. | Leak fixed (good build deployed or code corrected); connections stable under load replay. |
-| `db-missing-index` | L2 | A migration dropped an index; one endpoint slows sharply. | Latency back under target. | Index restored; slow query rate at baseline. |
-| `db-mdl-pileup` | L3 | `ALTER TABLE` waits on a metadata lock held by a forgotten open transaction; every later query on the table queues behind it. | Queries on the table complete. | Idle transaction found and the app code path that leaves it open fixed. |
-| `db-replica-lag-nopk` | L4 | A table has no primary key, so with row-based replication the replica scans per row event and lags during a batch job. The app reads its own writes from the replica. | Users see their own writes. | Primary key added and read-your-writes handled (reads after writes go to the source). |
+| `databases/1.1` | L1 | New app build leaks a connection on an error path until MySQL hits `max_connections` (ERROR 1040). Variant: disk full from binlogs with no expiry. | Connections available, errors stop. | Leak fixed (good build deployed or code corrected); connections stable under load replay. |
+| `databases/2.1` | L2 | A migration dropped an index; one endpoint slows sharply. | Latency back under target. | Index restored; slow query rate at baseline. |
+| `databases/3.1` | L3 | `ALTER TABLE` waits on a metadata lock held by a forgotten open transaction; every later query on the table queues behind it. | Queries on the table complete. | Idle transaction found and the app code path that leaves it open fixed. |
+| `databases/4.1` | L4 | A table has no primary key, so with row-based replication the replica scans per row event and lags during a batch job. The app reads its own writes from the replica. | Users see their own writes. | Primary key added and read-your-writes handled (reads after writes go to the source). |
 
 ### Production services
 
 | ID | Level | Fault | Mitigate | Fix |
 | --- | --- | --- | --- | --- |
-| `svc-crashloop-env` | L1 | Typo in an env var in `shop.env` after a config change; the service crash-loops. | Service running. | Config corrected. |
-| `svc-tls-chain` | L2 | Served cert chain is missing an intermediate, so some clients fail. A second cert expires in 2 days. | All clients connect. | Full chain served and the expiring cert renewed. |
-| `svc-memory-leak` | L3 | A new app build leaks memory slowly. | Memory stable (rollback). | Leak identified with pprof and the fix deployed. |
-| `svc-cache-stampede` | L4 | Redis restarts, a cache stampede hits MySQL, MySQL saturates, retries without backoff keep it down. | Error rate under target. | Backoff, request coalescing and concurrency limits in place; survives a forced Redis restart during load replay. |
+| `services/1.1` | L1 | Typo in an env var in `shop.env` after a config change; the service crash-loops. | Service running. | Config corrected. |
+| `services/2.1` | L2 | Served cert chain is missing an intermediate, so some clients fail. A second cert expires in 2 days. | All clients connect. | Full chain served and the expiring cert renewed. |
+| `services/3.1` | L3 | A new app build leaks memory slowly. | Memory stable (rollback). | Leak identified with pprof and the fix deployed. |
+| `services/4.1` | L4 | Redis restarts, a cache stampede hits MySQL, MySQL saturates, retries without backoff keep it down. | Error rate under target. | Backoff, request coalescing and concurrency limits in place; survives a forced Redis restart during load replay. |
 
 ### Distributed systems (multi-node, M5)
 
 | ID | Level | Fault | Mitigate | Fix |
 | --- | --- | --- | --- | --- |
-| `dist-bad-healthcheck` | L1 | HAProxy's health check hits a static path, so a broken app node stays in rotation. | Error rate under target. | Health check uses a real readiness endpoint. |
-| `dist-clock-skew` | L2 | One node's clock drifts with NTP disabled; token validation fails and leases flap. | Errors stop. | NTP restored; skew alert added. |
-| `dist-etcd-fsync` | L3 | One etcd member's disk has high fsync latency; elections flap and config reads time out. | Config reads succeed. | Disk issue fixed or member replaced. |
-| `dist-metastable` | L4 | Brief partial network loss between two nodes triggers retries and queue backlog that keep the system overloaded after the network recovers. | Load shed, errors stop. | Retry budgets, backoff and admission control in place; survives a repeat trigger. |
+| `distributed/1.1` | L1 | HAProxy's health check hits a static path, so a broken app node stays in rotation. | Error rate under target. | Health check uses a real readiness endpoint. |
+| `distributed/2.1` | L2 | One node's clock drifts with NTP disabled; token validation fails and leases flap. | Errors stop. | NTP restored; skew alert added. |
+| `distributed/3.1` | L3 | One etcd member's disk has high fsync latency; elections flap and config reads time out. | Config reads succeed. | Disk issue fixed or member replaced. |
+| `distributed/4.1` | L4 | Brief partial network loss between two nodes triggers retries and queue backlog that keep the system overloaded after the network recovers. | Load shed, errors stop. | Retry budgets, backoff and admission control in place; survives a repeat trigger. |
 
 ### Backlog candidates
 
@@ -413,10 +413,10 @@ Acceptance: a fresh `start` shows populated dashboards within 30s of the VM bein
 
 - `start`, `shell`, `status`, `hint`, `verify`, `quiz`, `stop`, `test`.
 - Check engine for all three check types, results store, scoring, tier notifications.
-- `linux-disk-full` implemented end to end, including CI verification.
-- `docs/writing-scenarios.md` using `linux-disk-full` as the worked example.
+- `linux/1.1` (disk full) implemented end to end, including CI verification.
+- `docs/writing-scenarios.md` using `linux/1.1` as the worked example.
 
-Acceptance: a learner can complete `linux-disk-full` start to finish, see tier changes on the dashboard, and find the result in `results.jsonl`. `opsschool test scenarios/linux/linux-disk-full` passes. **Stop for review.**
+Acceptance: a learner can complete `linux/1.1` start to finish, see tier changes on the dashboard, and find the result in `results.jsonl`. `opsschool test scenarios/linux/1.1` passes. **Stop for review.**
 
 ### M4: Remaining L1–L2 scenarios
 

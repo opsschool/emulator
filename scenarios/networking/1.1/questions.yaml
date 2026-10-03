@@ -1,0 +1,13 @@
+- id: stub
+  prompt: /etc/resolv.conf says nameserver 127.0.0.53. What is that?
+  type: choice
+  choices:
+    - The site resolver
+    - systemd-resolved's local stub, which forwards to the configured servers
+    - The payments service
+    - A typo for 127.0.0.1
+  answer: 1
+- id: dead
+  prompt: Which resolver address did the config push set?
+  type: text
+  answer_from_var: dead_resolver

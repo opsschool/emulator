@@ -76,7 +76,14 @@ func (l *Lima) Run(ctx context.Context, script string, env []string) (Result, er
 func (l *Lima) CopyIn(ctx context.Context, local, remote string) error {
 	// limactl copy runs as the Lima user; stage in /tmp, then move as root.
 	tmp := "/tmp/opsschool-copy-" + fmt.Sprint(time.Now().UnixNano())
-	if _, err := must(ctx, "limactl", "copy", "-r", local, SessionName+":"+tmp); err != nil {
+	args := []string{"copy", local, SessionName + ":" + tmp}
+	// Only for directories: the rsync backend treats a -r source as one.
+	if fi, err := os.Stat(local); err != nil {
+		return err
+	} else if fi.IsDir() {
+		args = append(args[:1], append([]string{"-r"}, args[1:]...)...)
+	}
+	if _, err := must(ctx, "limactl", args...); err != nil {
 		return err
 	}
 	res, err := l.Run(ctx, fmt.Sprintf("rm -rf %s && mkdir -p \"$(dirname %s)\" && mv %s %s", shellQuote(remote), shellQuote(remote), tmp, shellQuote(remote)), nil)

@@ -1,0 +1,17 @@
+category: services
+image: single-node
+curriculum: https://www.opsschool.org/security_201.html
+summary: >
+  Since last night's certificate renewal, the mobile app and other API
+  clients fail to connect to https://api.shop.internal with certificate
+  errors. Browsers load the site fine.
+randomize:
+  days_left:
+    range: [1, 3]
+fix_verification:
+  restart: [nginx.service]
+  reboot: false
+  load_replay: 30s
+mitigate_hold: 60s
+time_limit: 45m
+target_time: 25m

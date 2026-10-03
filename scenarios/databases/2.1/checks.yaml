@@ -1,0 +1,21 @@
+mitigated:
+  - name: order history p99 under 500ms
+    type: promql
+    expr: >
+      histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{route="GET /customers/{id}/orders"}[1m]))) < 0.5
+  - name: error rate under 1%
+    type: promql
+    expr: >
+      (sum(rate(http_requests_total{code=~"5.."}[1m])) or vector(0))
+      / sum(rate(http_requests_total[1m])) < 0.01
+fixed:
+  - name: order history query plan is efficient
+    type: script
+    run: checks/index_ok.sh
+  - name: slow query rate back to baseline
+    type: promql
+    expr: rate(mysql_global_status_slow_queries[2m]) < 0.05
+preserve:
+  - name: no orders lost
+    type: script
+    run: checks/orders_preserved.sh

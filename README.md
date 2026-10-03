@@ -1,11 +1,11 @@
-# Ops School simulator
+# Ops School emulator
 
 Start a production environment in a broken state, debug it with real tools,
 and get graded as you go. A hands-on companion to the
-[Ops School curriculum](https://ops-school.readthedocs.io).
+[Ops School curriculum](https://www.opsschool.org).
 
 ```
-opsschool start linux-disk-full --user jdoe
+opsschool start linux/1.1 --user jdoe
 ```
 
 You get a shell on a VM, a Grafana dashboard with live metrics and logs, and a
@@ -29,7 +29,7 @@ or later for the scenario VM.
 go build -o bin/opsschool ./cmd/opsschool
 bin/opsschool image build single-node        # once, 10-20 minutes
 bin/opsschool list
-bin/opsschool start linux-disk-full --user jdoe
+bin/opsschool start linux/1.1 --user jdoe
 bin/opsschool shell                          # debug as root in the VM
 bin/opsschool status                         # tiers, time, hints
 bin/opsschool hint                           # -10 points each
@@ -48,10 +48,10 @@ scenario machine as a privileged systemd container; see
 
 ## Status
 
-Milestones M0 to M3 from [docs/design.md](docs/design.md) are built, with
-one scenario (`linux-disk-full`). It has been played start to finish and
-passes `opsschool test` with the container driver. The Lima path (VM image
-and driver) is written but has not been run yet.
+Milestones M0 to M4 from [docs/design.md](docs/design.md) are built: the
+ten single-node L1–L2 scenarios, two in each of linux, performance,
+networking, databases and services. All pass `opsschool test` with the Lima
+driver.
 
 ## Writing scenarios
 

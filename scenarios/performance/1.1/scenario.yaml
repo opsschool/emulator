@@ -1,0 +1,18 @@
+category: performance
+image: single-node
+curriculum: https://www.opsschool.org/cron_101.html
+alerts:
+  - "ShopLatency: p99 latency above 80ms (fired and resolved 6 times in the last hour)"
+summary: >
+  The shop has become sluggish. Pages that loaded instantly yesterday now
+  sometimes take much longer, and latency alerts keep firing and clearing.
+randomize:
+  job:
+    choices: [feed-build, sitemap-build, catalog-export]
+fix_verification:
+  restart: [shop.service, cron.service]
+  reboot: false
+  load_replay: 180s
+mitigate_hold: 120s
+time_limit: 45m
+target_time: 20m
