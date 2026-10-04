@@ -1,0 +1,22 @@
+category: networking
+image: single-node
+curriculum: https://www.opsschool.org/networking_201.html
+alerts:
+  - "ShopOrderErrors: more than 5% of POST /orders requests are failing (5xx), worst at peak"
+summary: >
+  Checkout fails for some customers at busy times; browsing is fine. The
+  payments team sees nothing wrong on their side. The security team turned
+  on stateful firewalling yesterday, and a kernel tuning change went out
+  with the same maintenance.
+randomize:
+  max:
+    choices: ["512", "768", "1024"]
+fix_verification:
+  restart: [shop.service, shop-worker.service]
+  reboot: true
+  load_replay: 180s
+load:
+  profile: peak
+mitigate_hold: 180s
+time_limit: 45m
+target_time: 25m

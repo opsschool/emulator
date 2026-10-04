@@ -1,0 +1,22 @@
+- id: what
+  prompt: What dropped the packets?
+  type: choice
+  choices:
+    - The payments service
+    - The kernel, because its connection tracking table was full
+    - A firewall rule that blocked payments
+    - The DNS server
+  answer: 1
+- id: max
+  prompt: What was nf_conntrack_max set to?
+  type: text
+  answer_from_var: max
+- id: why-checkout
+  prompt: Why did checkout fail but browsing work?
+  type: choice
+  choices:
+    - Browsing is cached by the CDN
+    - Checkout makes new connections and DNS lookups for payments, and each needs a new tracking entry; browsing reuses existing connections
+    - Checkout uses a different firewall rule
+    - Browsing doesn't use TCP
+  answer: 1
