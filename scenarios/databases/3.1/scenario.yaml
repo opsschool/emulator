@@ -1,0 +1,20 @@
+category: databases
+image: single-node
+curriculum: https://www.opsschool.org/security_101.html
+alerts:
+  - "ShopHealthCheckFailing: /health through the load balancer has failed for 2m"
+  - "ShopErrorRate: more than 5% of requests are failing (5xx)"
+summary: >
+  The shop is down. The database team applied a small tuning change and
+  restarted MySQL, and it won't come back up. They've checked the
+  permissions on the new directory twice and say they're fine.
+randomize:
+  tmpdir:
+    choices: [/data/mysql-tmp, /data/tmp/mysql, /data/scratch]
+fix_verification:
+  restart: [mysql.service, shop.service, shop-worker.service]
+  reboot: true
+  load_replay: 60s
+mitigate_hold: 60s
+time_limit: 45m
+target_time: 20m
