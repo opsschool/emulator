@@ -1,5 +1,9 @@
 # Ops School emulator
 
+[![CI](https://github.com/opsschool/emulator/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/opsschool/emulator/actions/workflows/ci.yml)
+[![Go version](https://img.shields.io/github/go-mod/go-version/opsschool/emulator)](go.mod)
+[![License](https://img.shields.io/github/license/opsschool/emulator)](LICENSE)
+
 Start a production environment in a broken state, debug it with real tools,
 and get graded as you go. A hands-on companion to the
 [Ops School curriculum](https://www.opsschool.org).
