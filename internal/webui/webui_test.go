@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -55,10 +56,14 @@ func TestPageServed(t *testing.T) {
 }
 
 func TestCharts(t *testing.T) {
+	// The charts are queried in parallel.
+	var mu sync.Mutex
 	var queries []string
 	prom := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query().Get("query")
+		mu.Lock()
 		queries = append(queries, q)
+		mu.Unlock()
 		if strings.Contains(q, "node_filesystem") {
 			w.Write([]byte(`{"status":"success","data":{"resultType":"matrix","result":[
 				{"metric":{"mountpoint":"/"},"values":[[1000,"40"],[1015,"41"]]},
