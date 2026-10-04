@@ -34,18 +34,21 @@ func runList(e *Env, args []string) error {
 	for _, err := range errs {
 		fmt.Fprintf(e.Stderr, "skipping: %v\n", err)
 	}
-	best := map[string]results.Result{}
+	best, fastest := map[string]results.Result{}, map[string]results.Result{}
 	if home, err := Home(e); err == nil {
 		if rs, err := results.Open(home).All(); err != nil {
 			fmt.Fprintf(e.Stderr, "reading results: %v\n", err)
 		} else {
 			best = results.Best(rs, *user)
+			fastest = results.Fastest(rs, *user)
 		}
 	}
 	tw := tabwriter.NewWriter(e.Stdout, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(tw, "ID\tBEST\tHINT")
+	fmt.Fprintln(tw, "ID\tBEST\tHINT\tFASTEST FIX\tMITIGATED")
 	for _, s := range scs {
-		fmt.Fprintf(tw, "%s\t%s\t%s\n", s.Spec.ID, bestLabel(best, s.Spec.ID), hintLabel(best, s.Spec.ID))
+		id := s.Spec.ID
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", id, bestLabel(best, id), hintLabel(best, id),
+			tierTime(fastest, id, results.TierFixed), tierTime(fastest, id, results.TierMitigated))
 	}
 	return tw.Flush()
 }
@@ -61,6 +64,16 @@ func hintLabel(best map[string]results.Result, id string) string {
 		return "yes"
 	}
 	return "no"
+}
+
+// tierTime is how long into the fastest run a tier passed, as m:ss. Both
+// times come from the same run: the one with the quickest fix.
+func tierTime(fastest map[string]results.Result, id, tier string) string {
+	at, ok := fastest[id].TierPassed[tier]
+	if !ok {
+		return "-"
+	}
+	return clock(at.Duration())
 }
 
 func bestLabel(best map[string]results.Result, id string) string {
