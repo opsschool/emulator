@@ -5,7 +5,7 @@
 #              digits of the MAC swapped. Packets go to a MAC nobody has.
 #   duplicate: the old payments box was kept running on the same segment
 #              with the same IP. It announces itself every 20 seconds, so the
-#              shop's ARP entry flips between the two hosts.
+#              shop's ARP entry points at the old host nearly all the time.
 set -euo pipefail
 
 case "$OPSSCHOOL_VAR_VARIANT" in

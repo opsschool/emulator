@@ -14,9 +14,10 @@ table (`ip neigh`). Something gave it the wrong one:
   goes to a MAC nobody has. The payments host never sees them.
 - **duplicate:** the previous payments host (`payments-old.service`, a
   namespace called `pay-old`) was kept running on the same segment with the
-  same IP. It announces the address every 20 seconds, so the entry flips
-  between the two hosts. While it points at the old host, connections are
-  refused, and checkout fails on and off.
+  same IP. Its HA agent announces the address every 20 seconds, and each
+  announcement overwrites the entry, so it points at the old host nearly
+  all the time. Connections to it are refused, and almost every checkout
+  fails.
 
 Everything else works: DNS resolves, the payments host can reach the shop,
 and other neighbors are fine. `ip neigh show 10.54.0.20` against
