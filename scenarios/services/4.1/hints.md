@@ -1,1 +1,0 @@
-The root filesystem is full, and it fills up again after you clean up. Find what is writing there (`du -xh --max-depth=2 / | sort -h | tail`), and which service owns it: `journalctl` and `systemctl status` show restart counts.

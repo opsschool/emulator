@@ -346,7 +346,7 @@ The bootstrap set is 24 scenarios, six categories with four levels each; built s
 | `services/2.1` | L2 | Served cert chain is missing an intermediate, so some clients fail. A second cert expires in 2 days. | All clients connect. | Full chain served and the expiring cert renewed. |
 | `services/3.1` | L3 | A config-sync timer reinstalls a bad payments URL from a git repository every five minutes, undoing manual fixes. | Checkout works for longer than the sync interval. | Repository corrected, sync still running. |
 | `services/3.2` | L3 | A new app build leaks memory slowly. | Memory stable (rollback). | Leak identified with pprof and the fix deployed. |
-| `services/4.1` | L4 | A vendor release of the thumbnail service fills `/` from a corrupt photo; MySQL aborts because InnoDB's temp files are on `/` (its data volume has room); Redis refuses writes. | Shop up (thumbnails stopped). | Release rolled back or photo quarantined, disk cleared, MySQL and Redis healthy. |
+| `services/4.1` | L4 | A vendor release of the thumbnail service fills `/` from a corrupt photo. Redis can't save its snapshot and refuses writes, so checkout fails; the shop's data volume has room. | Checkout works (thumbnails stopped, space freed). | Release rolled back or photo quarantined, disk cleared, Redis saving again. |
 | `services/4.2` | L4 | Redis restarts, a cache stampede hits MySQL, MySQL saturates, retries without backoff keep it down. | Error rate under target. | Backoff, request coalescing and concurrency limits in place; survives a forced Redis restart during load replay. |
 
 ### Distributed systems (multi-node, M5)
