@@ -43,7 +43,7 @@ func TestDashboard(t *testing.T) {
 			rows = append(rows, p.Title)
 		}
 	}
-	want := "Tier status,Service (RED),Host (USE),MySQL,Redis,Logs,Scenario"
+	want := "Tier status,Edge (what customers see),Service (RED),Host (USE),MySQL,Redis,Logs,Scenario"
 	if got := strings.Join(rows, ","); got != want {
 		t.Errorf("rows %s, want %s", got, want)
 	}

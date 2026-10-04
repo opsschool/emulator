@@ -31,12 +31,15 @@ type State struct {
 	TargetTime time.Duration `json:"target_time"`
 	// TierPassed maps a tier to when it passed.
 	TierPassed map[string]time.Time `json:"tier_passed"`
-	HintsUsed  int                  `json:"hints_used"`
-	Quiz       *results.QuizResult  `json:"quiz,omitempty"`
-	DataLoss   bool                 `json:"data_loss"`
-	LastVerify *VerifyReport        `json:"last_verify,omitempty"`
-	Events     []Event              `json:"events"`
-	DaemonPID  int                  `json:"daemon_pid"`
+	// DocsHint is true once the free curriculum hint was shown. HintsUsed
+	// counts the hints that cost points.
+	DocsHint   bool                `json:"docs_hint"`
+	HintsUsed  int                 `json:"hints_used"`
+	Quiz       *results.QuizResult `json:"quiz,omitempty"`
+	DataLoss   bool                `json:"data_loss"`
+	LastVerify *VerifyReport       `json:"last_verify,omitempty"`
+	Events     []Event             `json:"events"`
+	DaemonPID  int                 `json:"daemon_pid"`
 }
 
 // Event is something that happened during the session, shown by status.
@@ -69,7 +72,7 @@ func (s *State) Result(now time.Time) results.Result {
 	r := results.Result{
 		User: s.User, Scenario: s.ScenarioID, Level: s.Level, Seed: s.Seed,
 		StartedAt: s.StartedAt, EndedAt: now, TierPassed: map[string]results.Seconds{},
-		HintsUsed: s.HintsUsed, DataLoss: s.DataLoss, Quiz: s.Quiz,
+		DocsHint: s.DocsHint, HintsUsed: s.HintsUsed, DataLoss: s.DataLoss, Quiz: s.Quiz,
 		TargetTime: results.SecondsOf(s.TargetTime),
 	}
 	for t, at := range s.TierPassed {

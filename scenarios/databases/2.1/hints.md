@@ -1,7 +1,1 @@
-Which route is slow? The dashboard's latency panel breaks it down by route.
----
-Slow requests usually mean slow queries. MySQL's slow query log is at `/data/mysql/slow.log`.
----
-Run the slow query with `EXPLAIN` in front of it. How many rows does MySQL expect to read?
----
-Something changed the schema this morning. See `/var/log/shop-migrate.log` and `/opt/shop/migrations`.
+Find the slow route on the dashboard, then the query behind it in MySQL's slow query log (`/data/mysql/slow.log`). Run that query with `EXPLAIN` in front of it: how many rows does MySQL expect to read, and why?

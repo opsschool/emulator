@@ -7,6 +7,9 @@ global:
 scrape_configs:
 {{- range .Targets}}
   - job_name: {{.Job}}
+{{- if .Path}}
+    metrics_path: {{.Path}}
+{{- end}}
     static_configs:
       - targets: ["{{.Addr}}"]
         labels:

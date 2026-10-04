@@ -113,6 +113,16 @@ type Stats struct {
 	Sent, OK, ClientErr, ServerErr, Failed atomic.Int64
 }
 
+// Result is the outcome of one request.
+type Result struct {
+	Method, Path, Route string
+	Customer            int
+	// Code is the HTTP status, or 0 when the request got no response.
+	Code     int
+	Err      error
+	Duration time.Duration
+}
+
 // Generator sends traffic to a shop.
 type Generator struct {
 	BaseURL   string
@@ -120,9 +130,12 @@ type Generator struct {
 	Stats     Stats
 	Products  int // catalog size to draw product IDs from
 	Customers int
-	// OnResult, if set, is called after every request with the route and
-	// status code (0 for a transport error).
-	OnResult func(route string, code int)
+	// NewConnShare is the share of requests sent on a fresh connection, the
+	// way first visits from new customers arrive. The rest reuse idle
+	// connections.
+	NewConnShare float64
+	// OnResult, if set, is called after every request.
+	OnResult func(Result)
 
 	mu          sync.Mutex
 	recentOrder []int64
@@ -229,12 +242,16 @@ func (g *Generator) one(ctx context.Context) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "shop-web/2.3")
 	req.Header.Set("X-Customer-ID", strconv.Itoa(customer))
+	req.Close = g.NewConnShare > 0 && rand.Float64() < g.NewConnShare
 	g.Stats.Sent.Add(1)
+	res := Result{Method: method, Path: path, Route: route, Customer: customer}
+	start := time.Now()
 	resp, err := g.Client.Do(req)
 	if err != nil {
 		if ctx.Err() == nil {
 			g.Stats.Failed.Add(1)
-			g.report(route, 0)
+			res.Err, res.Duration = err, time.Since(start)
+			g.report(res)
 		}
 		return
 	}
@@ -254,12 +271,13 @@ func (g *Generator) one(ctx context.Context) {
 		}
 	}
 	io.Copy(io.Discard, resp.Body)
-	g.report(route, resp.StatusCode)
+	res.Code, res.Duration = resp.StatusCode, time.Since(start)
+	g.report(res)
 }
 
-func (g *Generator) report(route string, code int) {
+func (g *Generator) report(r Result) {
 	if g.OnResult != nil {
-		g.OnResult(route, code)
+		g.OnResult(r)
 	}
 }
 

@@ -27,7 +27,7 @@ func init() {
 	register("start", "start <category>/<level>.<n> --user <name>", "Start a scenario: boot the machine, break it, start load and grading.", runStart)
 	register("shell", "shell", "Open a root shell in the scenario machine.", runShell)
 	register("status", "status [-w]", "Show tier progress, elapsed time and hints used.", runStatus)
-	register("hint", "hint", "Reveal the next hint (costs points).", runHint)
+	register("hint", "hint", "Point to the curriculum (free), then reveal a hint (costs points).", runHint)
 	register("verify", "verify", "Claim a fix: restart, reboot if needed, replay load, then grade the fixed tier.", runVerify)
 	register("quiz", "quiz", "Answer the scenario's optional quiz questions.", runQuiz)
 	register("stop", "stop", "End the scenario, record your result and tear everything down.", runStop)
@@ -392,7 +392,11 @@ func printStatus(e *Env, s *session.Status) {
 		fmt.Fprintf(e.Stdout, "%s as %s   not begun yet: the shop is running healthy before the scenario starts\n", st.ScenarioID, st.User)
 		return
 	}
-	fmt.Fprintf(e.Stdout, "%s as %s   elapsed %s of %s   hints %d\n\n", st.ScenarioID, st.User, s.Elapsed, st.TimeLimit, st.HintsUsed)
+	hint := "not used"
+	if st.HintsUsed > 0 {
+		hint = "used"
+	}
+	fmt.Fprintf(e.Stdout, "%s as %s   elapsed %s of %s   hint %s\n\n", st.ScenarioID, st.User, s.Elapsed, st.TimeLimit, hint)
 	for _, t := range results.Tiers {
 		line := "not yet"
 		if at, ok := st.TierPassed[t]; ok {
@@ -439,11 +443,18 @@ func runHint(e *Env, args []string) error {
 		return err
 	}
 	var h struct {
-		Hint         string
+		Docs, Hint   string
 		Index, Total int
 	}
 	if err := (session.Client{}).Post("/hint", nil, &h); err != nil {
 		return err
+	}
+	if h.Docs != "" {
+		fmt.Fprintf(e.Stdout, "Free hint: the Ops School curriculum covers this. Read\n\n  %s\n", h.Docs)
+		if h.Total > 0 {
+			fmt.Fprintf(e.Stdout, "\nStill stuck? `opsschool hint` again gives a more direct hint (-%d points).\n", results.HintPenalty)
+		}
+		return nil
 	}
 	if h.Hint == "" {
 		fmt.Fprintf(e.Stdout, "No more hints (%d used).\n", h.Total)
@@ -597,7 +608,11 @@ func runStop(e *Env, args []string) error {
 			fmt.Fprintf(e.Stdout, "  %-10s not passed\n", t)
 		}
 	}
-	fmt.Fprintf(e.Stdout, "  hints      %d\n", res.HintsUsed)
+	hint := "not used"
+	if res.HintsUsed > 0 {
+		hint = "used"
+	}
+	fmt.Fprintf(e.Stdout, "  hint       %s\n", hint)
 	fmt.Fprintf(e.Stdout, "Saved to %s\n", results.Open(home).Path)
 	return terr
 }

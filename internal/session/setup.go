@@ -73,7 +73,9 @@ func NewGenerator(s *scenario.Scenario) (*loadgen.Generator, error) {
 	if err != nil {
 		return nil, err
 	}
-	return loadgen.New(fmt.Sprintf("http://127.0.0.1:%d", telemetry.ShopPort), p), nil
+	g := loadgen.New(fmt.Sprintf("http://127.0.0.1:%d", telemetry.ShopPort), p)
+	g.NewConnShare = s.Spec.Load.NewConnections
+	return g, nil
 }
 
 // Bring up the telemetry stack and a fresh machine for the scenario.

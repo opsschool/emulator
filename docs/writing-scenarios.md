@@ -97,6 +97,9 @@ target_time: 20m
   are saying. Both describe symptoms, never the cause.
 - `randomize` gives each session different details, so a second attempt is
   not identical. Scripts get each value as `OPSSCHOOL_VAR_<NAME>`.
+- `load` picks the traffic: `profile: steady` (the default) or `peak`, or a
+  `schedule` of rates. `new_connections: 0.25` sends a quarter of requests on
+  a fresh connection, for faults that depend on connection counts.
 - `fix_verification` says what `opsschool verify` does before grading `fixed`.
   Restart what a real fix would have to survive. Set `reboot: true` when the
   fix must persist across boots (fstab, firewall rules, resolver config).
@@ -178,7 +181,10 @@ pprof port), `{{prometheus}}` and `{{var.<name>}}`.
 Metric names to build on: `http_requests_total{route,code}`,
 `http_request_duration_seconds`, `shop_db_pool_*`, `shop_cache_requests_total`,
 `shop_worker_queue_depth`, plus everything from node_exporter,
-process-exporter, mysqld_exporter and redis_exporter.
+process-exporter, mysqld_exporter and redis_exporter. When requests may never
+reach the shop (dropped or refused connections), grade on what the edge load
+balancer saw instead: `edge_requests_total{route,code}` and
+`edge_request_duration_seconds`.
 
 ## 6. mitigate.sh and solve.sh
 
@@ -188,8 +194,12 @@ leave `fixed` failing, which proves the tiers measure different things.
 
 ## 7. hints.md, SOLUTION.md, questions.yaml
 
-- `hints.md`: ordered hints separated by `---` lines, from a nudge to nearly
-  the answer. Each costs the learner 10 points.
+- `hints.md`: one hint. Learners first get the `curriculum` link, free;
+  this hint comes second and costs 10 points. Make it more direct than the
+  chapter: name the layer or the tool and the observation that matters, but
+  leave the cause and the fix for the learner. Point `curriculum` at the
+  chapter, or the section, that covers the topic; if none does, improve the
+  curriculum.
 - `SOLUTION.md`: what happened, how to mitigate, how to fix, and links to the
   curriculum.
 - `questions.yaml` (optional): a short quiz for learning. It does not affect

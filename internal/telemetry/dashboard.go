@@ -120,6 +120,15 @@ func Dashboard(scenarioID string, extra []byte) ([]byte, error) {
 	b.place(stat("Elapsed", `max(opsschool_session_elapsed_seconds)`, "s", nil, nil), 6, 4)
 	b.place(stat("Hints used", `max(opsschool_hints_used)`, "none", nil, nil), 6, 4)
 
+	b.row("Edge (what customers see)")
+	b.place(timeseries("Edge requests by status", "reqps",
+		query{`sum by (code) (rate(edge_requests_total[1m]))`, "{{code}}"}), 8, 8)
+	b.place(timeseries("Edge error rate (5xx)", "percentunit",
+		query{`(sum(rate(edge_requests_total{code=~"5.."}[1m])) or vector(0)) / sum(rate(edge_requests_total[1m]))`, "5xx"}), 8, 8)
+	b.place(timeseries("Edge latency", "s",
+		query{`histogram_quantile(0.5, sum by (le) (rate(edge_request_duration_seconds_bucket[1m])))`, "p50"},
+		query{`histogram_quantile(0.99, sum by (le) (rate(edge_request_duration_seconds_bucket[1m])))`, "p99"}), 8, 8)
+
 	b.row("Service (RED)")
 	b.place(timeseries("Request rate by route", "reqps",
 		query{`sum by (route) (rate(http_requests_total{job="shop"}[1m]))`, "{{route}}"}), 8, 8)
@@ -188,6 +197,7 @@ func Dashboard(scenarioID string, extra []byte) ([]byte, error) {
 	b.place(timeseries("Connected clients", "short", query{`redis_connected_clients`, "clients"}), 8, 8)
 
 	b.row("Logs")
+	b.place(logs("Edge errors", `{job="edge"} |~ "\" 5[0-9][0-9] "`), 24, 10)
 	b.place(logs("Shop logs", `{job="shop"}`), 24, 10)
 	b.place(logs("System journal", `{job="journal"}`), 24, 10)
 

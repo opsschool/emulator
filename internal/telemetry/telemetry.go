@@ -52,7 +52,7 @@ var Targets = []Target{
 	{"redis", 9121, 19121},
 }
 
-type renderedTarget struct{ Job, Instance, Addr string }
+type renderedTarget struct{ Job, Instance, Addr, Path string }
 
 // Stack is a rendered telemetry stack in a directory.
 type Stack struct {
@@ -152,9 +152,13 @@ func (s *Stack) data() renderData {
 		if s.Network != "" {
 			addr = fmt.Sprintf("scenario-vm:%d", t.VMPort)
 		}
-		d.Targets = append(d.Targets, renderedTarget{t.Job, "scenario-vm", addr})
+		d.Targets = append(d.Targets, renderedTarget{t.Job, "scenario-vm", addr, ""})
 	}
-	d.Targets = append(d.Targets, renderedTarget{"opsschool", "host", fmt.Sprintf("%s:%d", cli, CLIMetricsPort)})
+	daemon := fmt.Sprintf("%s:%d", cli, CLIMetricsPort)
+	d.Targets = append(d.Targets,
+		renderedTarget{"opsschool", "host", daemon, ""},
+		// The session daemon also plays the shop's load balancer.
+		renderedTarget{"edge", "edge-1", daemon, "/edge/metrics"})
 	return d
 }
 

@@ -72,6 +72,7 @@ func runLoadgen(e *Env, args []string) error {
 	profile := fs.String("profile", "steady", "steady or peak")
 	rps := fs.Float64("rps", 0, "constant rate instead of a profile")
 	dur := fs.Duration("duration", 0, "stop after this long (default: until interrupted)")
+	newConns := fs.Float64("new-connections", 0, "share of requests sent on a fresh connection (0 to 1)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -90,6 +91,7 @@ func runLoadgen(e *Env, args []string) error {
 		defer cancel()
 	}
 	g := loadgen.New(*target, p)
+	g.NewConnShare = *newConns
 	done := make(chan struct{})
 	go func() {
 		t := time.NewTicker(5 * time.Second)

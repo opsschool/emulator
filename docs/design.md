@@ -116,8 +116,8 @@ CONTRIBUTING.md
 | `opsschool list` | List scenario IDs and the learner's best result. |
 | `opsschool start <id> --user <name>` | Boot the VM, start the telemetry stack, apply the break, start load. Print the shell command and Grafana URL. Start the timer. |
 | `opsschool shell` | Open a shell in the running scenario VM. |
-| `opsschool status` | Show each tier's state, elapsed time and hints used. |
-| `opsschool hint` | Reveal the next hint. Recorded for scoring. |
+| `opsschool status` | Show each tier's state, elapsed time and whether the hint was used. |
+| `opsschool hint` | First call: point to the curriculum chapter, free. Second call: reveal the scenario's one hint, recorded for scoring. |
 | `opsschool verify` | Learner claims a fix. Run fix verification: restart the service, reboot if the scenario requires it, replay load, then evaluate the `fixed` checks. |
 | `opsschool quiz` | Answer the scenario's optional quiz questions. |
 | `opsschool stop` | Tear down the VM and telemetry stack. Write the final result. |
@@ -142,7 +142,7 @@ scenarios/networking/4.1/
   mitigate.sh       reference mitigation (CI only, never shown to learners)
   solve.sh          reference fix (CI only)
   questions.yaml    optional quiz questions
-  hints.md          ordered hints, separated by "---"
+  hints.md          one hint, shown after the free curriculum link
   dashboard.json    optional extra Grafana panels
   SOLUTION.md       writeup, links to the curriculum chapter
 ```
@@ -269,11 +269,12 @@ How faults are injected:
 The base dashboard is in every scenario and has these rows:
 
 1. **Tier status:** `opsschool_check_passed{tier}` for each tier, plus elapsed time.
-2. **Service (RED):** request rate, error rate and latency percentiles by route.
-3. **Host (USE):** CPU, memory, swap, disk space and inodes, disk I/O and iowait, network, load.
-4. **MySQL:** connections, threads running, queries per second, slow queries, InnoDB row lock waits, replica lag.
-5. **Redis:** memory, hit rate, connected clients.
-6. **Logs:** app and system logs from Loki.
+2. **Edge:** what customers see at the load balancer: requests by status, error rate, latency.
+3. **Service (RED):** request rate, error rate and latency percentiles by route.
+4. **Host (USE):** CPU, memory, swap, disk space and inodes, disk I/O and iowait, network, load.
+5. **MySQL:** connections, threads running, queries per second, slow queries, InnoDB row lock waits, replica lag.
+6. **Redis:** memory, hit rate, connected clients.
+7. **Logs:** edge errors, app and system logs from Loki.
 
 The CLI exposes its own metrics endpoint that Prometheus scrapes: `opsschool_check_passed{scenario,tier}` (0 or 1), `opsschool_session_elapsed_seconds` and `opsschool_hints_used`.
 
@@ -283,11 +284,13 @@ The CLI exposes its own metrics endpoint that Prometheus scrapes: `opsschool_che
 - Steady mixed traffic by default (browse, view product, place order), at a rate the single-node image handles comfortably.
 - Scenarios can set a load profile in `scenario.yaml`: `steady`, `peak` (periodic bursts) or a custom rate schedule.
 - `load_replay` during fix verification runs the scenario's profile at peak for the configured duration.
+- `load.new_connections` (0 to 1) sends that share of requests on a fresh connection; the rest reuse idle ones.
+- The generator stands in for the edge load balancer: it exports `edge_requests_total` and `edge_request_duration_seconds` (job `edge`) and ships an access log to Loki (`{job="edge"}`). Requests that get no response are recorded as 502 or 504, as a load balancer would return them.
 
 ## Results and scoring
 
-- Results are appended to `~/.opsschool/results.jsonl`: username, scenario ID, seed, start and end times, per-tier pass times, hints used, and whether fix verification caused data loss.
-- Suggested score per scenario: 100 points per tier passed, minus 10 per hint, with a time bonus for passing under a scenario's target time. Keep the formula in one place so it can change.
+- Results are appended to `~/.opsschool/results.jsonl`: username, scenario ID, seed, start and end times, per-tier pass times, whether the free curriculum hint and the paid hint were used, and whether fix verification caused data loss.
+- Suggested score per scenario: 100 points per tier passed, minus 10 for the hint (the curriculum link is free), with a time bonus for passing under a scenario's target time. Keep the formula in one place so it can change.
 - Collateral damage: scenarios can declare `preserve` checks (for example, the orders table row count must not drop). Failing a preserve check caps the `fixed` tier as failed.
 
 ## Scenario catalog
@@ -320,7 +323,7 @@ The bootstrap set is 24 scenarios, six categories with four levels each; built s
 | --- | --- | --- | --- | --- |
 | `networking/1.1` | L1 | `resolv.conf` points to a dead resolver after a simulated DHCP change. Outbound calls by hostname fail. | Resolution works. | Resolver config fixed at its source so it survives reboot. |
 | `networking/2.1` | L2 | An iptables rule drops traffic to the app port from the proxy. SSH works. | Traffic flows. | Rule removed from the persisted firewall config; survives reboot. |
-| `networking/3.1` | L3 | A stateful firewall rule turns on connection tracking, and a tuning change caps the table at ~40 entries. At peak the kernel drops packets: 10 s hangs and errors. | Errors stop. | Limit sized in the sysctl file; firewall rule kept; survives reboot. |
+| `networking/3.1` | L3 | A stateful firewall rule turns on connection tracking, and a tuning change caps the table at about 1000 entries. At peak the kernel drops packets: 10 s hangs and errors that only the edge load balancer sees. | Errors stop. | Limit sized in the sysctl file; firewall rule kept; survives reboot. |
 | `networking/3.2` | L3 | Wrong MAC for the payments host on the service segment: a stale static neighbor with swapped digits, or a decommissioned host announcing the same IP. | Checkout works. | Pin removed or old host retired; ARP learns the right MAC after a reboot. |
 | `networking/3.3` | L3 | App's outbound client has keepalive disabled; TIME\_WAIT sockets exhaust ephemeral ports under load. Variant: conntrack table full. | Errors stop. | Keepalive or pooling enabled; survives load replay. |
 | `networking/4.1` | L4 | A tunnel lowers the MTU and ICMP is filtered, so path MTU discovery fails. Small responses work, large ones hang. | Large responses complete. | MTU corrected or MSS clamped, and ICMP fragmentation-needed allowed. |

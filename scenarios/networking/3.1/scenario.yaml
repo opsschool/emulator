@@ -7,17 +7,21 @@ summary: >
   At busy times the shop hangs or fails for a share of customers; at quiet
   times it's fine. The shop's own metrics show nothing slow. The security
   team turned on stateful firewalling yesterday, and a kernel tuning change
-  went out with the same maintenance.
+  went out with the same maintenance. The load balancer's logs and metrics
+  are on the dashboard.
 randomize:
   max:
-    choices: ["38", "40"]
+    choices: ["896", "1024"]
 fix_verification:
   restart: [shop.service, shop-worker.service]
   reboot: true
   load_replay: 180s
 load:
   profile: peak
-# The mitigated check already looks back over 3 minutes, a full peak cycle.
-mitigate_hold: 60s
+  # A quarter of customers arrive on a new connection, as first visits do.
+  # About 600-800 tracked connections at quiet times, 1500 at peak.
+  new_connections: 0.25
+# With the check's 2-minute lookback, the hold covers a full peak cycle.
+mitigate_hold: 90s
 time_limit: 45m
 target_time: 25m

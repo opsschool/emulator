@@ -35,7 +35,9 @@ type Result struct {
 	EndedAt   time.Time `json:"ended_at"`
 	// TierPassed maps a tier to how long after the start it passed.
 	TierPassed map[string]Seconds `json:"tier_passed"`
-	HintsUsed  int                `json:"hints_used"`
+	// DocsHint is true when the learner asked for the free curriculum hint.
+	DocsHint  bool `json:"docs_hint,omitempty"`
+	HintsUsed int  `json:"hints_used"`
 	// DataLoss is true when a preserve check failed during fix verification.
 	DataLoss   bool        `json:"data_loss"`
 	Quiz       *QuizResult `json:"quiz,omitempty"`

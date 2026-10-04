@@ -3,6 +3,36 @@
 Changes to [design.md](design.md) and judgment calls made while building.
 Newest first.
 
+## 2026-10-04: Hints: the curriculum first, free; then one paid hint
+
+From the project owner. The first `opsschool hint` points at the scenario's
+`curriculum` link and costs nothing. The second shows the scenario's one
+hint, which costs `HintPenalty` (10 points) and points the way without
+giving the answer. There are no more after that. `hints.md` holds exactly
+one hint (more is a validation error), and `opsschool list` has a HINT
+column saying whether the best result used it. Results record the free
+hint as `docs_hint`, unscored.
+
+Most linked curriculum chapters don't cover their scenario's topic yet;
+the curriculum is improved alongside the scenarios.
+
+## 2026-10-04: An edge load balancer, played by the load generator
+
+Some faults drop connections before they reach the shop, so the shop's
+metrics never see them (networking/3.1). A real site would see them at its
+load balancer. The load generator now records every result as one would:
+`edge_requests_total{route,code}` and `edge_request_duration_seconds`,
+scraped as job `edge`, and an nginx-style access log in Loki
+(`{job="edge"}`). Requests that got no response count as 504 (timeout) or
+502 (refused, reset). The session daemon serves the metrics; `opsschool
+test` serves them itself. The dashboard has an Edge row and an edge error
+log panel. This replaces `opsschool_loadgen_requests_total`, whose name
+gave away the harness.
+
+`load.new_connections` sets the share of requests sent on a fresh
+connection, as first visits from new customers would be. It defaults to 0
+(reuse connections), so existing scenarios are unchanged.
+
 ## 2026-10-04: The harness works on a full disk
 
 Scenario scripts used to be staged in `/tmp` and copied to
