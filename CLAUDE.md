@@ -27,6 +27,11 @@ doesn't cover.
 - Generate or template Grafana dashboards from code where practical;
   hand-edited Grafana JSON is hard to review.
 - Learners are trusted. Grading needs to be accurate, not tamper-proof.
+- A scenario's `curriculum` link is the learner's free first hint. If the
+  curriculum doesn't cover the topic, add a section to
+  [opsschool/curriculum](https://github.com/opsschool/curriculum), one PR per
+  section, following its style guide (`meta/style_guide.rst`, "Writing"):
+  plain English, precise and qualified statements, no headline style.
 - Scenarios live in `scenarios/<category>/<level>.<n>/`, for example
   `scenarios/linux/1.1/`, and that path is their ID (`linux/1.1`). The level
   comes from the directory; `n` is the next free number at that level.
