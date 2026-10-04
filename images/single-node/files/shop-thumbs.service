@@ -1,0 +1,16 @@
+[Unit]
+Description=Catalog thumbnails from uploaded photos
+After=local-fs.target
+RequiresMountsFor=/data/uploads
+# Keep restarting; a photo that crashes it is retried until someone looks.
+StartLimitIntervalSec=0
+
+[Service]
+User=shop
+Group=shop
+ExecStart=/opt/shop-thumbs/current/thumbd
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target

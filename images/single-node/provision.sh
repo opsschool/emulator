@@ -30,7 +30,7 @@ install_packages() {
     ca-certificates curl gnupg unzip jq openssl \
     nginx redis-server cron logrotate iptables-persistent \
     strace lsof sysstat tcpdump bind9-dnsutils iproute2 iptables htop procps psmisc \
-    net-tools ncat less vim-tiny
+    net-tools ncat less vim-tiny python3 systemd-coredump
   # Tracing tools vary by distribution; install what exists.
   for pkg in bpftrace linux-tools-generic; do
     apt-get install -y -q --no-install-recommends "$pkg" || echo "skipping $pkg"
@@ -171,6 +171,17 @@ install_shop() {
     name=${variant##*/shop-}
     install -D -m 0755 "$variant" "/usr/local/lib/shop-builds/$name/shop"
   done
+  # The thumbnail sidecar. 1.5.0 is the alternate release a scenario deploys.
+  install -d -o shop -g shop /data/uploads
+  local v
+  for v in 1.4.2:False 1.5.0:True; do
+    local dir="/opt/shop-thumbs/releases/${v%%:*}"
+    [[ ${v%%:*} == 1.5.0 ]] && dir=/usr/local/lib/shop-builds/thumbd-1.5.0
+    install -d "$dir"
+    sed "s/@VERSION@/${v%%:*}/; s/@ZERO_COPY@/${v##*:}/" "$files/thumbd.py" >"$dir/thumbd"
+    chmod 0755 "$dir/thumbd"
+  done
+  ln -sfn /opt/shop-thumbs/releases/1.4.2 /opt/shop-thumbs/current
   [[ -f /etc/shop/shop.env ]] || install -m 0640 -g shop "$files/shop.env" /etc/shop/shop.env
   install -m 0644 "$files"/shop*.service /etc/systemd/system/
   install -m 0644 "$files/shop-maintenance.cron" /etc/cron.d/shop-maintenance
@@ -280,7 +291,7 @@ enable_services() {
   sed -i 's/^ENABLED=.*/ENABLED="true"/' /etc/default/sysstat
   systemctl daemon-reload
   systemctl enable --now redis-server mysql cron sysstat \
-    shop-payments shop shop-worker nginx \
+    shop-payments shop shop-worker shop-thumbs nginx \
     node_exporter process-exporter mysqld_exporter redis_exporter alloy
   systemctl restart nginx
 }

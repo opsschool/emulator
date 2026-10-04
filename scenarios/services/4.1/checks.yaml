@@ -1,0 +1,24 @@
+mitigated:
+  - name: order error rate under 1%
+    type: promql
+    expr: >
+      (sum(rate(http_requests_total{route="POST /orders",code=~"5.."}[1m])) or vector(0))
+      / sum(rate(http_requests_total{route="POST /orders"}[1m])) < 0.01
+fixed:
+  - name: the root disk has room
+    type: promql
+    expr: >
+      node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"} > 0.20
+  - name: the thumbnail service is running steadily
+    type: script
+    run: checks/thumbs_ok.sh
+  - name: crash dumps can't fill the disk
+    type: script
+    run: checks/coredump_ok.sh
+  - name: Redis saves its data and still protects it
+    type: script
+    run: checks/redis_ok.sh
+preserve:
+  - name: no orders lost
+    type: script
+    run: checks/orders_preserved.sh

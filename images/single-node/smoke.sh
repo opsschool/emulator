@@ -16,7 +16,7 @@ check() { # name, command...
   fi
 }
 
-for unit in mysql redis-server nginx shop shop-worker shop-payments node_exporter process-exporter mysqld_exporter redis_exporter alloy; do
+for unit in mysql redis-server nginx shop shop-worker shop-payments shop-thumbs node_exporter process-exporter mysqld_exporter redis_exporter alloy; do
   check "unit $unit active" systemctl is-active --quiet "$unit"
 done
 check "health through nginx" curl -fsS http://127.0.0.1/health

@@ -1,0 +1,22 @@
+- id: chain
+  prompt: Which chain of events broke checkout?
+  type: choice
+  choices:
+    - Redis ran out of memory and evicted the checkout locks
+    - A crashing thumbnail service filled the disk with crash dumps, Redis couldn't save and refused writes, and checkout's lock failed
+    - The thumbnail service used all the CPU
+    - MySQL couldn't write orders to the full disk
+  answer: 1
+- id: photo
+  prompt: Which photo crashed the thumbnail service?
+  type: text
+  answer_from_var: photo
+- id: redis-setting
+  prompt: Why not leave stop-writes-on-bgsave-error off?
+  type: choice
+  choices:
+    - It is a fine fix
+    - Redis would keep accepting writes it can't save, so a restart could lose them without anyone noticing
+    - It makes Redis slower
+    - It can't be changed at runtime
+  answer: 1
