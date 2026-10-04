@@ -11,12 +11,12 @@
   prompt: What was nf_conntrack_max set to?
   type: text
   answer_from_var: max
-- id: why-checkout
-  prompt: Why did checkout fail but browsing work?
+- id: why-peak
+  prompt: Why did failures only happen at busy times?
   type: choice
   choices:
-    - Browsing is cached by the CDN
-    - Checkout makes new connections and DNS lookups for payments, and each needs a new tracking entry; browsing reuses existing connections
-    - Checkout uses a different firewall rule
-    - Browsing doesn't use TCP
+    - The shop was slower at peak
+    - Each new connection and DNS lookup needs a tracking entry, and at peak there are more of them than the table holds
+    - The firewall rule only applies at peak
+    - Peak traffic uses more memory
   answer: 1

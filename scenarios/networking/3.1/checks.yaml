@@ -1,18 +1,17 @@
 mitigated:
-  - name: order error rate under 1%
+  - name: error rate under 1%
     type: promql
     expr: >
-      (sum(rate(http_requests_total{route="POST /orders",code=~"5.."}[1m])) or vector(0))
-      / sum(rate(http_requests_total{route="POST /orders"}[1m])) < 0.01
+      (sum(rate(http_requests_total{code=~"5.."}[1m])) or vector(0))
+      / sum(rate(http_requests_total[1m])) < 0.01
 fixed:
   - name: the connection tracking table is sized for the host
     type: script
     run: checks/conntrack_ok.sh
-  - name: no packets dropped for a full table during load
+  - name: p99 latency stayed under 250ms for the last 3 minutes
     type: promql
     expr: >
-      (sum(increase(node_nf_conntrack_stat_drop[3m])) or vector(0))
-      + (sum(increase(node_nf_conntrack_stat_early_drop[3m])) or vector(0)) == 0
+      max_over_time((histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket[30s]))))[3m:15s]) < 0.25
   - name: the firewall still drops invalid packets
     type: script
     run: checks/firewall_ok.sh

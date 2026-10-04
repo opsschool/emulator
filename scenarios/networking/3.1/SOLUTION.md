@@ -6,16 +6,16 @@ Two changes went out in one maintenance window. The security team added a
 stateful firewall rule (`-m conntrack --ctstate INVALID -j DROP`), which
 makes the kernel track every connection and UDP flow. A tuning change in
 `/etc/sysctl.d/60-kernel-tables.conf` set `net.netfilter.nf_conntrack_max`
-to a few hundred entries, on the theory that the host handles few
-connections.
+to 40 or so, because someone measured 22 tracked connections at 3 a.m.
 
-Every DNS lookup, every new TCP connection, and every connection in
-TIME_WAIT takes an entry. The shop resolves the payments service by name
-for every order, so checkout creates a stream of short-lived entries. At
-peak the table fills, and the kernel drops packets that would need a new
-entry: `nf_conntrack: table full, dropping packet` in the kernel log. DNS
-lookups for payments time out, and checkout fails. Browsing reuses
-long-lived connections and keeps working.
+Every TCP connection takes an entry, and keeps it for two minutes in
+TIME_WAIT after it closes; every DNS lookup takes one too. At quiet times
+the host stays under the limit. At peak the table fills, and the kernel
+drops packets that would need a new entry: `nf_conntrack: table full,
+dropping packet` in the kernel log. New connections from the load balancer
+and lookups by the shop are dropped and retried until they time out, so a
+share of requests hang for about 10 seconds or fail. The shop's own
+metrics show nothing slow, because those requests never reach it.
 
 ## Mitigate
 
@@ -25,7 +25,8 @@ Raise the limit at runtime: `sysctl -w net.netfilter.nf_conntrack_max=262144`.
 
 Fix the tuning file so the limit survives a reboot, and keep the security
 team's rule. `conntrack -S` and `/proc/sys/net/netfilter/nf_conntrack_count`
-show how close the table runs to its limit.
+show how close the table runs to its limit; size it for peak, with room to
+spare.
 
 ## Curriculum
 
