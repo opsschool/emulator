@@ -37,6 +37,8 @@ if [[ $(systemd-detect-virt --container || true) == none ]]; then
   # shellcheck disable=SC2016 # expands in the child shell
   check "swap on" bash -c '[[ -n $(swapon --noheadings) ]]'
   check "unit dnsmasq active" systemctl is-active --quiet dnsmasq
+  # shellcheck disable=SC2016 # expanded by the inner bash
+  check "/data image fully allocated" bash -c '(( $(stat -c "%b * %B" /var/lib/data.img) >= $(stat -c %s /var/lib/data.img) ))'
   check "payments host on the service segment" curl -fsS http://10.54.0.20:8081/health
   # shellcheck disable=SC2016 # expanded by the inner bash
   check "payments resolves to the service segment" bash -c '[[ $(getent hosts payments.shop.internal) == 10.54.0.20* ]]'

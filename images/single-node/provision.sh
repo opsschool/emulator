@@ -55,11 +55,19 @@ setup_data_volume() {
     else
       fallocate -l 6G /var/lib/data.img
     fi
-    mkfs.ext4 -q -F -L shopdata /var/lib/data.img
+    # nodiscard: discarding would punch holes in the image file, and then
+    # writes to /data need space on / (a full / would break /data too).
+    mkfs.ext4 -q -F -E nodiscard -L shopdata /var/lib/data.img
     mkdir -p /data
     echo '/var/lib/data.img /data ext4 loop,defaults 0 2' >>/etc/fstab
   fi
   mountpoint -q /data || mount /data
+  if [[ $mode != container ]]; then
+    # Keep the image file fully allocated, like a real disk: fill any holes,
+    # and don't let the weekly fstrim punch new ones.
+    fallocate -l 6G /var/lib/data.img
+    systemctl mask fstrim.timer
+  fi
 }
 
 configure_mysql() {
@@ -239,6 +247,35 @@ exporter_unit() { # name, user, exec
     >"/etc/systemd/system/$1.service"
 }
 
+# Customers' wishlists live in Redis and never expire, as a real shop's
+# long-lived Redis data would. They make Redis's snapshot about 30 MB, so a
+# full root disk reliably stops Redis from saving.
+seed_wishlists() {
+  log "wishlists"
+  systemctl start redis-server
+  if [[ $(redis-cli --scan --pattern 'wishlist:*' --count 1000 | head -1) ]]; then
+    log "already seeded"
+    return
+  fi
+  python3 - "$SEED_CUSTOMERS" "$SEED_PRODUCTS" <<'PY' | redis-cli --pipe >/dev/null
+import random, sys
+customers, products = int(sys.argv[1]), int(sys.argv[2])
+rng = random.Random(42)
+out = sys.stdout.buffer
+def cmd(*args):
+    out.write(b"*%d\r\n" % len(args))
+    for a in args:
+        a = str(a).encode()
+        out.write(b"$%d\r\n%s\r\n" % (len(a), a))
+for c in rng.sample(range(1, customers + 1), customers // 2):
+    items = []
+    for _ in range(rng.randint(3, 25)):
+        items += [rng.randint(1, products), 1700000000 + rng.randint(0, 60000000)]
+    cmd("HSET", f"wishlist:{c}", *items)
+PY
+  redis-cli save >/dev/null
+}
+
 install_exporters() {
   log "exporters"
   id exporter >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin exporter
@@ -324,6 +361,7 @@ main() {
   install_shop
   configure_tls
   seed_database
+  seed_wishlists
   install_exporters
   install_alloy
   install_harness

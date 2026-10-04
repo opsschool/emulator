@@ -1,0 +1,22 @@
+- id: chain
+  prompt: Why did checkout fail when the shop's data volume had plenty of space?
+  type: choice
+  choices:
+    - The data volume was secretly full
+    - Redis couldn't save its snapshot to the full root disk, so it refused writes, and checkout needs a lock in Redis
+    - The thumbnail service killed the shop
+    - MySQL ran out of connections
+  answer: 1
+- id: photo
+  prompt: Which photo set it off?
+  type: text
+  answer_from_var: photo
+- id: stopping
+  prompt: Why is stopping the thumbnail service only a mitigation?
+  type: choice
+  choices:
+    - It is a fine fix
+    - New products get no thumbnails, and the bad release is still deployed, so the next corrupt photo does the same
+    - Stopping services is never allowed
+    - It makes MySQL slower
+  answer: 1

@@ -3,6 +3,25 @@
 Changes to [design.md](design.md) and judgment calls made while building.
 Newest first.
 
+## 2026-10-04: /data is fully allocated; Redis holds customer wishlists
+
+`/data` is an ext4 image on a loop device, backed by `/var/lib/data.img` on
+the root disk. `mkfs.ext4` discarded the device, which punched holes in the
+image file: only about 1 GB of its 6 GB was allocated. Once `/` was full,
+writes to `/data` that needed new blocks failed, and MySQL couldn't create
+`ibtmp1` on restart. The image is now formatted with `-E nodiscard`,
+allocated in full with `fallocate`, and `fstrim.timer` is masked so it stays
+that way. A smoke check guards it. `/data` now behaves like its own disk.
+
+Redis held only short-lived cache, about 75 KB on disk, so a snapshot could
+fit in the space ext4 leaves after a "full" disk and services/4.1 failed
+only some of the time. The image now seeds customer wishlists
+(`wishlist:<customer>` hashes, never expiring), which makes the snapshot
+about 15 MB. The shop doesn't read them yet.
+
+services/4.1 is now the Redis story: the root disk fills, Redis refuses
+writes, checkout fails. MySQL is out of it.
+
 ## 2026-10-04: Hints: the curriculum first, free; then one paid hint
 
 From the project owner. The first `opsschool hint` points at the scenario's
