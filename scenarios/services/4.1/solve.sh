@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# Reference fix: roll the thumbnail service back, clear the dumps, put the
-# core dump limits back, and let Redis save again.
+# Reference fix: roll the thumbnail service back, so it rejects the bad
+# photo, free the disk, and bring MySQL back.
 set -euo pipefail
 ln -sfn /opt/shop-thumbs/releases/1.4.2 /opt/shop-thumbs/current
-systemctl restart shop-thumbs.service
-sed -i '/^MaxUse=/d; /^KeepFree=/d' /etc/systemd/coredump.conf.d/50-thumbs-vendor.conf
-rm -f /var/lib/systemd/coredump/*
+systemctl stop shop-thumbs.service
+rm -rf /var/tmp/shop-thumbs
+systemctl start shop-thumbs.service
+systemctl reset-failed mysql.service
+systemctl start mysql.service
 redis-cli config set stop-writes-on-bgsave-error yes >/dev/null
 redis-cli bgsave >/dev/null

@@ -1,22 +1,22 @@
 - id: chain
-  prompt: Which chain of events broke checkout?
+  prompt: Why did MySQL go down when its data volume had plenty of space?
   type: choice
   choices:
-    - Redis ran out of memory and evicted the checkout locks
-    - A crashing thumbnail service filled the disk with crash dumps, Redis couldn't save and refused writes, and checkout's lock failed
-    - The thumbnail service used all the CPU
-    - MySQL couldn't write orders to the full disk
+    - Its data volume was secretly full
+    - InnoDB's temporary files live in tmpdir on the root disk, which the thumbnail service filled
+    - The thumbnail service killed it
+    - It ran out of memory
   answer: 1
 - id: photo
-  prompt: Which photo crashed the thumbnail service?
+  prompt: Which photo set it off?
   type: text
   answer_from_var: photo
-- id: redis-setting
-  prompt: Why not leave stop-writes-on-bgsave-error off?
+- id: stopping
+  prompt: Why is stopping the thumbnail service only a mitigation?
   type: choice
   choices:
     - It is a fine fix
-    - Redis would keep accepting writes it can't save, so a restart could lose them without anyone noticing
-    - It makes Redis slower
-    - It can't be changed at runtime
+    - New products get no thumbnails, and the bad release is still deployed, so the next corrupt photo does the same
+    - Stopping services is never allowed
+    - It makes MySQL slower
   answer: 1

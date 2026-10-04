@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-# Reference mitigation: let Redis accept writes even though it can't save.
-# The disk is still full and filling.
+# Reference mitigation: stop the thumbnail service, free the disk, and bring
+# MySQL back. Photos no longer get thumbnails.
 set -euo pipefail
-redis-cli config set stop-writes-on-bgsave-error no >/dev/null
+systemctl stop shop-thumbs.service
+rm -rf /var/tmp/shop-thumbs
+systemctl reset-failed mysql.service
+systemctl start mysql.service
+redis-cli bgsave >/dev/null

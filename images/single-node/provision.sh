@@ -30,7 +30,7 @@ install_packages() {
     ca-certificates curl gnupg unzip jq openssl \
     nginx redis-server cron logrotate iptables-persistent \
     strace lsof sysstat tcpdump bind9-dnsutils iproute2 iptables htop procps psmisc \
-    net-tools ncat less vim-tiny python3 systemd-coredump iputils-arping conntrack
+    net-tools ncat less vim-tiny python3 iputils-arping conntrack
   # Tracing tools vary by distribution; install what exists.
   for pkg in bpftrace linux-tools-generic; do
     apt-get install -y -q --no-install-recommends "$pkg" || echo "skipping $pkg"
@@ -194,7 +194,7 @@ install_shop() {
     local dir="/opt/shop-thumbs/releases/${v%%:*}"
     [[ ${v%%:*} == 1.5.0 ]] && dir=/usr/local/lib/shop-builds/thumbd-1.5.0
     install -d "$dir"
-    sed "s/@VERSION@/${v%%:*}/; s/@ZERO_COPY@/${v##*:}/" "$files/thumbd.py" >"$dir/thumbd"
+    sed "s/@VERSION@/${v%%:*}/; s/@SPILL@/${v##*:}/" "$files/thumbd.py" >"$dir/thumbd"
     chmod 0755 "$dir/thumbd"
   done
   ln -sfn /opt/shop-thumbs/releases/1.4.2 /opt/shop-thumbs/current

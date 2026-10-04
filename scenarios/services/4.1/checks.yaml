@@ -1,9 +1,13 @@
 mitigated:
-  - name: order error rate under 1%
+  - name: health endpoint is up
+    type: http
+    url: http://{{vm}}/health
+    expect_status: 200
+  - name: error rate under 1%
     type: promql
     expr: >
-      (sum(rate(http_requests_total{route="POST /orders",code=~"5.."}[1m])) or vector(0))
-      / sum(rate(http_requests_total{route="POST /orders"}[1m])) < 0.01
+      (sum(rate(http_requests_total{code=~"5.."}[1m])) or vector(0))
+      / sum(rate(http_requests_total[1m])) < 0.01
 fixed:
   - name: the root disk has room
     type: promql
@@ -12,9 +16,6 @@ fixed:
   - name: the thumbnail service is running steadily
     type: script
     run: checks/thumbs_ok.sh
-  - name: crash dumps can't fill the disk
-    type: script
-    run: checks/coredump_ok.sh
   - name: Redis saves its data and still protects it
     type: script
     run: checks/redis_ok.sh

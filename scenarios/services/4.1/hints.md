@@ -1,9 +1,7 @@
-What does the shop say when checkout fails? `journalctl -u shop` around a failed order.
+Why won't MySQL start? `systemctl status mysql`, then the end of `/var/log/mysql/error.log`.
 ---
-Checkout depends on Redis. Ask Redis what it thinks: `redis-cli info persistence`, and its log in `/var/log/redis`.
+MySQL's data is on /data, but which other paths does it write to? `mysql --help --verbose | grep -E '^(datadir|tmpdir)'` shows its settings. How full are those filesystems?
 ---
-The disk is full. What filled it, and when did it start? `du -xsh /var/lib/* | sort -h`.
+The root disk is full. What filled it, and does it come back after you clean up? `du -xh --max-depth=2 / | sort -h | tail`.
 ---
-Those are crash dumps. `coredumpctl list` shows which program keeps crashing; `journalctl -u shop-thumbs` shows what it was doing.
----
-Why were the dumps allowed to use the whole disk? `systemd-analyze cat-config systemd/coredump.conf`.
+Who writes there? `journalctl -u shop-thumbs`, and `systemctl status shop-thumbs` for its restart count.

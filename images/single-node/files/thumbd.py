@@ -5,53 +5,62 @@ Photos land in /data/uploads/queue. Each one is decoded, and its thumbnail
 is written to /data/uploads/thumbs. Photos that can't be decoded go to
 /data/uploads/rejected.
 """
-import ctypes
 import logging
 import os
 import sys
+import tempfile
 import time
 
 VERSION = "@VERSION@"
-# 1.5.0 reads the segment table in place instead of copying it (THUMB-77).
-ZERO_COPY = @ZERO_COPY@
+# 1.5.0 decodes large frames through a scratch file instead of memory, to
+# keep thumbd's memory flat (THUMB-77).
+SPILL = @SPILL@
 
 QUEUE = "/data/uploads/queue"
 THUMBS = "/data/uploads/thumbs"
 REJECTED = "/data/uploads/rejected"
+SCRATCH = "/var/tmp/shop-thumbs"
 
 log = logging.getLogger("thumbd")
 
-# Decode buffers are allocated and touched once at start, so decoding never
-# waits on page faults.
-POOL = bytearray(os.urandom(128 << 20))
+# Decode buffer, allocated once at start.
+POOL = bytearray(os.urandom(8 << 20))
 
 
 class BadPhoto(Exception):
     pass
 
 
-def segment_table(data):
-    """Returns the 16-byte segment table that the photo's header points to."""
+def decode(data):
+    """Decodes the photo's frame and returns its first 16 bytes."""
     if data[:2] != b"\xff\xd8":
         raise BadPhoto("not a JPEG")
-    off = int.from_bytes(data[2:6], "big")
-    if ZERO_COPY:
-        buf = (ctypes.c_char * len(data)).from_buffer_copy(data)
-        return ctypes.string_at(ctypes.addressof(buf) + off, 16)
-    if off + 16 > len(data):
-        raise BadPhoto(f"segment table at {off} is past the end of the file")
-    return data[off:off + 16]
+    width = int.from_bytes(data[2:4], "big")
+    height = int.from_bytes(data[4:6], "big")
+    frame = width * height * 3
+    if not SPILL:
+        if frame > 64 * len(data):
+            raise BadPhoto(f"{width}x{height} is implausible for a {len(data)}-byte file")
+        return bytes(POOL[:16])
+    os.makedirs(SCRATCH, exist_ok=True)
+    scratch = tempfile.NamedTemporaryFile(dir=SCRATCH, prefix="frame-", delete=False)
+    with scratch:
+        left = frame
+        while left > 0:
+            n = min(left, len(POOL))
+            scratch.write(POOL[:n])
+            left -= n
+    os.remove(scratch.name)
+    return bytes(POOL[:16])
 
 
 def thumbnail(path):
     with open(path, "rb") as f:
         data = f.read()
-    table = segment_table(data)
-    n = len(data) % len(POOL)
-    POOL[n:n + 16] = table
+    head = decode(data)
     name = os.path.basename(path)
     with open(os.path.join(THUMBS, name), "wb") as f:
-        f.write(data[:2] + table)
+        f.write(data[:2] + head)
     os.remove(path)
     log.info("thumbnail %s (%d bytes)", name, len(data))
 

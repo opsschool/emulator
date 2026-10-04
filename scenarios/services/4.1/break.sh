@@ -1,23 +1,13 @@
 #!/usr/bin/env bash
-# Three things go wrong in a row. Version 1.5.0 of the thumbnail service
-# crashes on one of the new photos, and systemd restarts it every second.
-# The vendor's core dump settings keep every crash dump, uncompressed, with
-# no limit, so the dumps fill the root disk in minutes. Redis can't write
-# its snapshot to the full disk and, as configured, refuses writes. Checkout
-# takes a lock in Redis and fails closed.
+# Version 1.5.0 of the thumbnail service decodes large frames through a
+# scratch file, sized from the photo's own header. One of the new photos
+# claims to be 65535x65535, a 12 GB frame: thumbd writes until the root disk
+# is full, crashes on the error, and leaves the file behind. systemd restarts
+# it, and it does the same again. MySQL keeps its data on /data, but InnoDB's
+# temporary files live in tmpdir, /tmp, on the root disk: a write there fails
+# and mysqld aborts, then can't start. Redis can't save either and refuses
+# writes.
 set -euo pipefail
-
-install -d /etc/systemd/coredump.conf.d
-cat >/etc/systemd/coredump.conf.d/50-thumbs-vendor.conf <<'CONF'
-# VND-31: the thumbnail vendor wants every crash dump, uncompressed and
-# complete, until they ship the fix for THUMB-77.
-[Coredump]
-Compress=no
-ProcessSizeMax=1G
-ExternalSizeMax=1G
-MaxUse=1T
-KeepFree=0
-CONF
 
 install -d /opt/shop-thumbs/releases/1.5.0
 install -m 0755 /usr/local/lib/shop-builds/thumbd-1.5.0/thumbd /opt/shop-thumbs/releases/1.5.0/thumbd
@@ -26,24 +16,24 @@ systemctl restart shop-thumbs.service
 logger -t deploy "shop-thumbs 1.5.0 (vendor release)"
 sleep 5
 
-# Wally's uploads: good photos, and one whose header points past its end.
+# Wally's uploads: good photos, and one whose header claims a huge frame.
 python3 - "$OPSSCHOOL_VAR_PHOTO" <<'PY'
 import os, sys
 q = "/data/uploads/queue"
 for i, name in enumerate(["IMG_2229.jpg", "IMG_2230.jpg", sys.argv[1], "IMG_2244.jpg"]):
-    off = 0xFFF00000 if name == sys.argv[1] else 6
+    w, h = (65535, 65535) if name == sys.argv[1] else (300 + i * 20, 200 + i * 10)
     with open(os.path.join(q, name), "wb") as f:
-        f.write(b"\xff\xd8" + off.to_bytes(4, "big") + os.urandom(20000 + i * 977))
+        f.write(b"\xff\xd8" + w.to_bytes(2, "big") + h.to_bytes(2, "big") + os.urandom(20000 + i * 977))
 PY
 chown shop:shop /data/uploads/queue/*
 
-# Wait until the dumps have filled the disk and Redis has failed a save.
+# Wait until the disk is full and the damage is done.
 for _ in $(seq 120); do
-  (($(df --output=avail -B1M / | tail -1) < 100)) && break
+  (($(df --output=avail -B1 / | tail -1) < 1048576)) && break
   sleep 5
 done
-redis-cli bgsave >/dev/null || true
+redis-cli bgsave >/dev/null 2>&1 || true
 for _ in $(seq 30); do
-  redis-cli info persistence | grep -q 'rdb_last_bgsave_status:err' && break
+  systemctl is-active --quiet mysql.service || break
   sleep 2
 done
