@@ -7,8 +7,13 @@ set -euo pipefail
 
 # Everything that holds files open on /data stops for the maintenance.
 # Alloy tails the shop log on /data; it is started again below.
-systemctl stop alloy.service shop.service shop-worker.service mysql.service # lint:allow alloy
+# shop-thumbs requires the mount, so systemd would mount /data again for it.
+systemctl stop alloy.service shop-thumbs.service shop.service shop-worker.service mysql.service # lint:allow alloy
 umount /data
+if mountpoint -q /data; then
+  echo "/data is still mounted" >&2
+  exit 1
+fi
 logger -t data-maint "INFRA-88: /data offline for integrity check"
 
 # The shop comes back while the volume is still offline. Its log directory
@@ -17,7 +22,11 @@ install -d -o shop -g shop /data/log/shop /data/sessions
 systemctl start shop.service
 sleep 5
 systemctl stop shop.service
-# Hours of that, enough to fill the root disk.
+# Hours of that, enough to fill the root disk. Never on the real volume.
+if mountpoint -q /data; then
+  echo "/data was mounted again during the break" >&2
+  exit 1
+fi
 f=/data/log/shop/app.log
 size=$(df --output=size -B1 / | tail -1)
 keep=$((size * 3 / 200))
@@ -29,5 +38,5 @@ left=$(($(avail) - keep))
 ((left > 0)) && { fallocate -o "$(stat -c %s "$f")" -l "$left" "$f" || true; }
 
 mount /data
-systemctl start mysql.service shop-worker.service shop.service alloy.service # lint:allow alloy
+systemctl start mysql.service shop-worker.service shop.service shop-thumbs.service alloy.service # lint:allow alloy
 logger -t data-maint "INFRA-88: /data back online"
