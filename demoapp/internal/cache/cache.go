@@ -64,3 +64,20 @@ func Get[T any](ctx context.Context, c *Cache, key string, load func() (T, error
 	}
 	return v, nil
 }
+
+// ErrLocked means another request holds the lock.
+var ErrLocked = errors.New("locked")
+
+// Lock takes a short-lived lock on key, so the same customer can't run two
+// checkouts at once (a double-clicked "Place order" would charge twice). It
+// fails closed: if Redis can't take the lock, the caller must not proceed.
+func (c *Cache) Lock(ctx context.Context, key string, ttl time.Duration) (release func(), err error) {
+	ok, err := c.Client.SetNX(ctx, "lock:"+key, "1", ttl).Result()
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, ErrLocked
+	}
+	return func() { c.Client.Del(context.WithoutCancel(ctx), "lock:"+key) }, nil
+}

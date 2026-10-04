@@ -3,6 +3,17 @@
 Changes to [design.md](design.md) and judgment calls made while building.
 Newest first.
 
+## 2026-10-04: Checkout takes a lock in Redis
+
+Before this, the shop used Redis only as a cache, and every Redis error fell
+back to MySQL, so no fault in Redis could hurt customers. Checkout now takes
+a ten-second per-customer lock in Redis (`SET lock:checkout:<id> NX`), so a
+double-clicked "Place order" can't charge twice. It fails closed: if Redis
+can't take the lock, the order fails. That makes scenarios about Redis
+possible (Redis refusing writes, evicting keys, a slow Redis). A request
+that finds the lock held gets 409; the load generator's customers rarely
+collide.
+
 ## 2026-10-04: The shop is Uncle Wally's Peanut Emporium
 
 The README opens with a setting for new learners: they are the SRE at Uncle
