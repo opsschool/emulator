@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # A cost-control change groups the shop and its worker into one systemd
 # slice and caps the slice's CPU. The host stays mostly idle, but the shop
-# is throttled whenever the slice uses its quota, and the worker's invoice
-# rendering uses much of it.
+# is throttled whenever the slice uses up its quota, which it does at any
+# real traffic: the quota was sized from the average, and the worker shares
+# it.
 set -euo pipefail
 
 slice="$OPSSCHOOL_VAR_SLICE.slice"
@@ -11,7 +12,7 @@ cat >"/etc/systemd/system/$slice" <<UNIT
 Description=Application services (cost allocation, FIN-207)
 
 [Slice]
-# Sized from last month's average CPU use plus headroom (FIN-207).
+# Sized from last month's average CPU use (2%) plus headroom (FIN-207).
 CPUQuota=${OPSSCHOOL_VAR_QUOTA}%
 UNIT
 for unit in shop shop-worker; do

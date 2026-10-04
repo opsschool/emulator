@@ -11,11 +11,13 @@ randomize:
   slice:
     choices: [apps, workloads, platform]
   quota:
-    choices: ["30", "35", "40"]
+    choices: ["4", "5", "6"]
 fix_verification:
   restart: [shop.service, shop-worker.service]
   reboot: true
   load_replay: 180s
+load:
+  profile: peak
 mitigate_hold: 120s
 time_limit: 45m
 target_time: 25m

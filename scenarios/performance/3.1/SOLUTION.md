@@ -4,14 +4,16 @@
 
 A cost-control rollout (FIN-207) moved `shop.service` and
 `shop-worker.service` into a new systemd slice and gave the slice a CPU
-quota of 30–40% of one CPU. The quota is enforced by the CPU controller of
+quota of 4–6% of one CPU, sized from last month's average use. The quota is enforced by the CPU controller of
 cgroup v2: once the processes in the slice have used their share of each
 100 ms period, the kernel stops scheduling them until the next period. The
 host itself stays mostly idle, so CPU graphs and `top` look healthy.
 
-The shop and the worker share the quota. The worker's invoice rendering uses
-a good part of it, so the shop is throttled for tens of milliseconds at a
-time. Latency rises, worst at peak load.
+Average use is low, but requests arrive in bursts, and the shop and the
+worker share the quota. Once a burst uses the slice's few milliseconds of
+CPU, every request waits for the next period, so the shop is held back for
+tens of milliseconds at a time. Latency rises, and at peak load it reaches
+hundreds of milliseconds.
 
 The evidence is in the cgroup: `cpu.stat` in the slice's directory under
 `/sys/fs/cgroup` shows `nr_throttled` and `throttled_usec` climbing.

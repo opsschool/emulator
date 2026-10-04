@@ -4,8 +4,8 @@
 
 A tuning change (DB-212) set MySQL's `tmpdir` to a new directory on the data
 volume, with the right owner and mode, and restarted MySQL. MySQL failed to
-start: its error log says it can't create files in the new directory, with
-errno 13, permission denied.
+start: its error log says `Unable to create temporary file inside
+"/data/mysql-tmp"; errno: 13`, permission denied.
 
 Unix permissions allow it. The denial comes from AppArmor: Ubuntu confines
 `mysqld` with a profile that lists the paths it may use, and the new
@@ -16,7 +16,8 @@ name="/data/mysql-tmp/..."`.
 ## Mitigate
 
 Get MySQL running: revert the tuning change, or take the profile out of the
-way (`aa-complain /usr/sbin/mysqld`, or unload it with
+way (switch it to complain mode with
+`apparmor_parser -C /etc/apparmor.d/usr.sbin.mysqld`, or unload it with
 `apparmor_parser -R`). Then restart MySQL and the shop.
 
 ## Fix
