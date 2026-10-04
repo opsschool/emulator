@@ -37,4 +37,4 @@ Reverting the tuning change is also a fix. Leaving MySQL unconfined is not.
 
 ## Curriculum
 
-- [Security 101](https://www.opsschool.org/security_101.html)
+- [Security 201: AppArmor](https://www.opsschool.org/security_201.html#apparmor)

@@ -1,6 +1,6 @@
 category: networking
 image: single-node
-curriculum: https://www.opsschool.org/networking_201.html
+curriculum: https://www.opsschool.org/security_201.html#the-connection-tracking-table
 alerts:
   - "ShopErrorRate: more than 5% of requests failing at peak, some taking 10s"
 summary: >

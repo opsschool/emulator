@@ -40,4 +40,4 @@ static pin in place of the real fix: the next NIC swap breaks it again.
 
 ## Curriculum
 
-- [Networking 101](https://www.opsschool.org/networking_101.html)
+- [Networking 101: ARP](https://www.opsschool.org/networking_101.html#arp)
