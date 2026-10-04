@@ -3,6 +3,91 @@
 Changes to [design.md](design.md) and judgment calls made while building.
 Newest first.
 
+## 2026-10-04: Sessions refuse an out-of-date image
+
+A base image is built once, but it bakes in `images/<image>/` and the shop
+built from `demoapp/`. A learner who pulls changes to either and keeps the
+old image gets scenarios that fail in confusing ways. So `opsschool image
+build` records a fingerprint of those files on the image (in the Lima ready
+marker, or a Docker label), and `start` and `test` refuse an image whose
+fingerprint doesn't match the checkout, with the command that rebuilds it.
+Images built before this have no fingerprint and count as out of date.
+
+- It's a hash of the files, not a version number someone has to remember to
+  bump. The cost is that a comment change in `provision.sh` also asks for a
+  rebuild.
+- Tests and testdata in `demoapp/` are left out, and so are `go.mod` and
+  `go.sum`: they change with the CLI's dependencies far more often than with
+  the shop's. A dependency bump that matters to the shop needs a rebuild by
+  hand.
+- There's no flag to start anyway. Starting from a stale image is the
+  confusing failure this is here to prevent.
+
+## 2026-10-04: The VM's initrd doesn't bring up the network
+
+Lima sessions took over two minutes to boot, and two of them were a
+timeout. Each session is a clone of the base image with a new MAC address.
+Ubuntu 26.04's initrd (dracut) brought the network card up as `enp0s4`, so
+on first boot cloud-init couldn't rename it to `eth0` for the new MAC (the
+link was busy), and `systemd-networkd-wait-online`, which netplan points at
+`eth0`, waited its full 120 seconds. The image now builds its initrd
+without dracut's network modules (including Ubuntu's `dyn-netconf`, which
+depends on them). The root disk is local, so the initrd never needed them.
+Boot went from 2 min 13 s to 15 s, and `opsschool start` from about three
+minutes to under one before the baseline begins.
+
+## 2026-10-04: The scoreboard shows the fastest fix
+
+`opsschool list` shows each scenario's best score, as before, and the
+learner's fastest time. The fastest run is the one with the quickest fix,
+and the mitigation time shown is from that same run, not the quickest
+mitigation of any run, so the two times always describe one attempt. Equal
+fix times go to the earlier mitigation. When no run fixed the scenario, the
+quickest mitigation is shown with no fix time. The best score and the
+fastest run can be different attempts: a run that used the hint can still
+be the fastest. Every result is already kept in `results.jsonl`, so this is
+worked out when the list is shown, not stored separately.
+
+## 2026-10-04: A session page in the browser
+
+From the project owner, who chose the layout from three designs. While a
+session runs, the daemon serves a page at `http://127.0.0.1:19999/`: the
+incident, progress, both hints, Verify and End session on the right; on
+the left a terminal on the scenario machine, or four dashboard charts, one
+at a time. It follows the system's light or dark setting and has a switch;
+the terminal is always dark. The font is Atkinson Hyperlegible Next, with
+Atkinson Hyperlegible Mono in the terminal, chosen because similar letters
+are easy to tell apart for readers whose first language isn't English.
+Fonts and xterm.js are embedded in the binary, so the page works offline.
+The CLI commands keep working alongside it.
+
+Building the page into the local daemon first keeps the UI separate from
+the harder parts of hosting (many VMs, accounts, isolation). A hosted
+version can serve the same page.
+
+- The terminal is xterm.js over a WebSocket to a pseudo-terminal running
+  the same command as `opsschool shell`. Two pinned modules, because the
+  standard library has neither: `github.com/coder/websocket` and
+  `github.com/creack/pty`. Each tab is its own shell; a dropped
+  connection, such as during a reboot, reconnects on the next keypress.
+- The page draws its charts from fixed PromQL queries the daemon runs
+  (`/api/charts`), so the page can't run arbitrary queries. Grafana is one
+  click away for everything else.
+- The page opens a root shell, so the daemon refuses requests whose Host
+  isn't a loopback address (DNS rebinding) and browser requests from other
+  origins (a site the learner visits). This covers the existing control
+  API too. `/metrics` stays open for Prometheus on the Docker network.
+- End session on the page records the result and tears the session down,
+  as `opsschool stop` does.
+- `opsschool start` tells the daemon when the healthy baseline ends, so the
+  page can count down to the scenario.
+- The terminal should feel like a Linux one: selecting text copies it, the
+  middle button pastes it, and Ctrl+Shift+C copies. Browsers keep Ctrl+W,
+  Ctrl+T and Ctrl+N for themselves, and a page can't take them in a normal
+  tab. The terminal's full screen button uses the Keyboard Lock API (Chrome
+  and Edge), which sends them to the shell. Outside full screen, the page
+  asks before the tab closes while a shell is connected.
+
 ## 2026-10-04: /data is fully allocated; Redis holds customer wishlists
 
 `/data` is an ext4 image on a loop device, backed by `/var/lib/data.img` on

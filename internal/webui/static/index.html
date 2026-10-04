@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ops School</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="vendor/xterm.css">
+<link rel="stylesheet" href="app.css">
+<script>
+  // Apply a saved theme before the page paints.
+  try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+<script type="module" src="app.js"></script>
+</head>
+<body>
+<header class="bar">
+  <div class="brand"><span class="logo" aria-hidden="true">OS</span><span>Ops School</span></div>
+  <span class="chip mono" id="scenario-id">…</span>
+  <span class="muted" id="clock"></span>
+  <div class="tiers">
+    <span class="tier" id="tier-mitigated">Mitigated</span>
+    <span class="tier" id="tier-fixed">Fixed</span>
+  </div>
+  <div class="spacer"></div>
+  <div class="actions">
+    <a class="btn" href="#hints">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2z"/></svg>
+      Hint
+    </a>
+    <button class="btn primary" id="verify" disabled>Verify my fix</button>
+    <button class="btn quiet" id="end">End session</button>
+    <button class="btn icon" id="theme" aria-label="Switch between light and dark mode">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></svg>
+    </button>
+  </div>
+</header>
+
+<div class="banner" id="banner" hidden></div>
+
+<main>
+  <div class="work">
+    <div class="toolbar">
+      <div class="seg" role="tablist" aria-label="Workspace">
+        <button role="tab" id="tab-terminal" aria-selected="true" aria-controls="terminal-view">Terminal</button>
+        <button role="tab" id="tab-dashboard" aria-selected="false" aria-controls="dashboard-view">Dashboard</button>
+      </div>
+      <ul class="tips" id="term-tips" aria-label="Terminal tips">
+        <li>Select text to copy it, middle-click to paste</li>
+        <li><kbd>Alt</kbd>+<kbd>Backspace</kbd> deletes a word. <kbd>Ctrl</kbd>+<kbd>W</kbd> closes the browser tab, except in full screen</li>
+      </ul>
+    </div>
+
+    <section class="term" id="terminal-view" role="tabpanel" aria-labelledby="tab-terminal">
+      <div class="term-tabs">
+        <div class="term-tablist" id="term-tablist"></div>
+        <button class="term-add" id="term-add" aria-label="Open another terminal">+</button>
+        <div class="spacer"></div>
+        <span class="term-state" id="term-state"></span>
+        <button class="term-full" id="term-full"
+          title="Full screen. Shortcuts like Ctrl+W go to the shell instead of the browser. Hold Esc to leave.">Full screen</button>
+      </div>
+      <div class="term-body" id="term-body"></div>
+    </section>
+
+    <section class="dash" id="dashboard-view" role="tabpanel" aria-labelledby="tab-dashboard" hidden>
+      <div class="charts" id="charts"></div>
+      <a class="grafana" id="grafana" target="_blank" rel="noopener">Open the full dashboard in Grafana
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>
+      </a>
+    </section>
+  </div>
+
+  <aside class="panel" aria-label="Incident">
+    <section id="waiting" hidden>
+      <h2>Getting ready</h2>
+      <p>The shop is up and serving normal traffic. Have a look at the dashboard now, so you know what healthy looks like.</p>
+      <p class="muted" id="waiting-time"></p>
+    </section>
+
+    <section id="paged" hidden>
+      <h2>You were paged</h2>
+      <p class="muted" id="summary"></p>
+      <div class="alerts" id="alerts"></div>
+    </section>
+
+    <section>
+      <h3>Your progress</h3>
+      <div class="step">
+        <span class="dot" id="dot-mitigated"></span>
+        <div><strong>Mitigated</strong> <span id="mitigated-at"></span><br>
+          <span class="muted small" id="mitigated-text">Get customers checking out again. We check this all the time.</span></div>
+      </div>
+      <div class="step">
+        <span class="dot" id="dot-fixed"></span>
+        <div><strong>Fixed</strong> <span id="fixed-at"></span><br>
+          <span class="muted small" id="fixed-text">When you think the cause is gone, press Verify. We restart the shop and replay a rush of customers. You can verify as often as you like.</span>
+          <ul class="small failures" id="failures" hidden></ul></div>
+      </div>
+    </section>
+
+    <section id="hints" class="hints">
+      <h3>Stuck? That's normal.</h3>
+      <div class="card" id="docs-card">
+        <span class="tag ok">FREE</span>
+        <strong>Read the curriculum</strong>
+        <span class="muted small">The Ops School curriculum covers this. Reading it doesn't cost any points.</span>
+        <button class="btn" id="docs-show">Show me where</button>
+        <a id="docs-link" target="_blank" rel="noopener" hidden></a>
+      </div>
+      <div class="card" id="hint-card">
+        <span class="tag warn">−10 POINTS</span>
+        <strong>Get a more specific hint</strong>
+        <span class="muted small" id="hint-help">It points you in the right direction without giving the answer away. We all need one sometimes.</span>
+        <div class="hint-text" id="hint-text" hidden></div>
+        <div class="row">
+          <button class="btn" id="hint-show">Show the hint</button>
+          <button class="btn primary" id="hint-confirm" hidden>Yes, show it (−10 points)</button>
+          <button class="btn quiet" id="hint-cancel" hidden>Not yet</button>
+        </div>
+      </div>
+    </section>
+  </aside>
+</main>
+
+<dialog id="verify-dialog" aria-labelledby="verify-title">
+  <h2 id="verify-title">Checking your fix</h2>
+  <p class="muted small">This takes a few minutes. If the machine reboots, your terminal disconnects and reconnects when you press a key.</p>
+  <ol class="log mono" id="verify-log"></ol>
+  <div id="verify-result"></div>
+  <div class="row end"><button class="btn" id="verify-close" disabled>Close</button></div>
+</dialog>
+
+<dialog id="end-dialog" aria-labelledby="end-title">
+  <div id="end-ask">
+    <h2 id="end-title">End the session?</h2>
+    <p>We'll record your result and delete the scenario machine. You can't come back to this session afterwards.</p>
+    <div class="row end">
+      <button class="btn quiet" id="end-cancel">Keep going</button>
+      <button class="btn primary" id="end-confirm">End session</button>
+    </div>
+  </div>
+  <div id="end-done" hidden>
+    <h2>Session ended</h2>
+    <div id="end-result"></div>
+    <p class="muted small">Your result is saved. The scenario machine is being deleted; you can close this tab.</p>
+  </div>
+</dialog>
+</body>
+</html>

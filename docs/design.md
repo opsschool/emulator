@@ -113,8 +113,8 @@ CONTRIBUTING.md
 
 | Command | Behavior |
 | --- | --- |
-| `opsschool list` | List scenario IDs and the learner's best result. |
-| `opsschool start <id> --user <name>` | Boot the VM, start the telemetry stack, apply the break, start load. Print the shell command and Grafana URL. Start the timer. |
+| `opsschool list` | List scenario IDs, the learner's best score, and their fastest fix with that run's mitigation time. |
+| `opsschool start <id> --user <name>` | Boot the VM, start the telemetry stack, apply the break, start load. Print the session page, shell command and Grafana URL. Start the timer. |
 | `opsschool shell` | Open a shell in the running scenario VM. |
 | `opsschool status` | Show each tier's state, elapsed time and whether the hint was used. |
 | `opsschool hint` | First call: point to the curriculum chapter, free. Second call: reveal the scenario's one hint, recorded for scoring. |
@@ -123,6 +123,8 @@ CONTRIBUTING.md
 | `opsschool stop` | Tear down the VM and telemetry stack. Write the final result. |
 | `opsschool validate <path>` | Validate a scenario directory (schema and lint). |
 | `opsschool test <path>` | Run the full CI verification for one scenario locally. |
+
+While a session runs, the daemon also serves a session page at `http://127.0.0.1:19999/` with the same actions: the incident, progress, hints, Verify and End session, a terminal on the scenario machine, and the key dashboard charts. See the decision "A session page in the browser".
 
 Only one scenario runs at a time in the MVP.
 

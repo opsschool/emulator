@@ -21,6 +21,10 @@ type Env struct {
 	Home    string
 	Machine vm.Driver
 	Say     func(string) // progress messages
+	// Fingerprint is the checkout's vm.Fingerprint for the scenario's
+	// image. Bring refuses a base image built from different files. Empty
+	// skips the check.
+	Fingerprint string
 }
 
 // NewSeed returns a random session seed.
@@ -80,13 +84,17 @@ func NewGenerator(s *scenario.Scenario) (*loadgen.Generator, error) {
 
 // Bring up the telemetry stack and a fresh machine for the scenario.
 func (e *Env) Bring(ctx context.Context, s *scenario.Scenario) error {
-	ready, err := e.Machine.BaseReady(ctx, s.Spec.Image)
+	built, fp, err := e.Machine.Base(ctx, s.Spec.Image)
 	if err != nil {
 		return err
 	}
-	if !ready {
-		return fmt.Errorf("the %s image is not built yet; run `opsschool image build %s --driver %s` (takes 10-20 minutes, once)",
-			s.Spec.Image, s.Spec.Image, e.Machine.Name())
+	rebuild := fmt.Sprintf("opsschool image build %s --driver %s", s.Spec.Image, e.Machine.Name())
+	if !built {
+		return fmt.Errorf("the %s image is not built yet; run `%s` (takes 10-20 minutes, once)", s.Spec.Image, rebuild)
+	}
+	if e.Fingerprint != "" && fp != e.Fingerprint {
+		return fmt.Errorf("your %s image is out of date: the files it's built from have changed since you built it, "+
+			"probably in a `git pull`. Rebuild it with `%s` (10-20 minutes)", s.Spec.Image, rebuild)
 	}
 	if exists, _ := e.Machine.Exists(ctx); exists {
 		return fmt.Errorf("a scenario machine already exists; run `opsschool stop` first")
@@ -106,7 +114,7 @@ func (e *Env) Bring(ctx context.Context, s *scenario.Scenario) error {
 	}
 	// Boot first, so the dashboards start with a running machine rather
 	// than its boot, which would skew the first minutes of every rate().
-	e.Say("Booting the scenario machine")
+	e.Say("Booting the scenario machine. This usually takes about a minute.")
 	if err := e.Machine.Create(ctx, s.Spec.Image); err != nil {
 		return err
 	}

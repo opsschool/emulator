@@ -5,6 +5,8 @@ go 1.27.0
 toolchain go1.27.1
 
 require (
+	github.com/coder/websocket v1.8.15
+	github.com/creack/pty v1.1.24
 	github.com/go-sql-driver/mysql v1.10.1
 	github.com/prometheus/client_golang v1.24.1
 	github.com/redis/go-redis/v9 v9.22.0

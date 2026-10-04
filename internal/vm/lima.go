@@ -41,20 +41,24 @@ func (l *Lima) has(ctx context.Context, name string) (bool, error) {
 }
 
 // ReadyMarker is written into the base instance's directory by
-// images/<image>/build.sh once the build has finished.
+// images/<image>/build.sh once the build has finished. It holds the
+// image's Fingerprint.
 const ReadyMarker = "opsschool-ready"
 
-func (l *Lima) BaseReady(ctx context.Context, image string) (bool, error) {
+func (l *Lima) Base(ctx context.Context, image string) (bool, string, error) {
 	ok, err := l.has(ctx, BaseInstance(image))
 	if err != nil || !ok {
-		return false, err
+		return false, "", err
 	}
 	dir, err := must(ctx, "limactl", "list", "--format", "{{.Dir}}", BaseInstance(image))
 	if err != nil {
-		return false, err
+		return false, "", err
 	}
-	_, err = os.Stat(filepath.Join(strings.TrimSpace(dir), ReadyMarker))
-	return err == nil, nil
+	b, err := os.ReadFile(filepath.Join(strings.TrimSpace(dir), ReadyMarker))
+	if err != nil {
+		return false, "", nil
+	}
+	return true, strings.TrimSpace(string(b)), nil
 }
 
 func (l *Lima) Create(ctx context.Context, image string) error {
@@ -99,7 +103,7 @@ func (l *Lima) CopyIn(ctx context.Context, local, remote string) error {
 }
 
 func (l *Lima) ShellCommand() []string {
-	return []string{"limactl", "shell", "--workdir", "/root", SessionName, "sudo", "-i"}
+	return []string{"limactl", "shell", "--workdir", "/", SessionName, "sudo", "-i"}
 }
 
 func (l *Lima) Reboot(ctx context.Context) error {

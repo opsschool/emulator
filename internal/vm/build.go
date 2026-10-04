@@ -16,7 +16,9 @@ type BuildOptions struct {
 	Image      string // e.g. single-node
 	Arch       string // amd64 or arm64
 	SeedOrders int    // 0 keeps versions.env
-	Out        io.Writer
+	// Fingerprint is recorded on the image; see Fingerprint.
+	Fingerprint string
+	Out         io.Writer
 }
 
 // FaultVariants are the alternate shop builds shipped in every image, by
@@ -123,5 +125,6 @@ func BuildContainerBase(ctx context.Context, o BuildOptions) error {
 	if err := step("stopping", "docker", "stop", "-t", "60", builder); err != nil {
 		return err
 	}
-	return step("saving "+BaseImage(o.Image), "docker", "commit", builder, BaseImage(o.Image))
+	return step("saving "+BaseImage(o.Image), "docker", "commit",
+		"--change", "LABEL "+FingerprintLabel+"="+o.Fingerprint, builder, BaseImage(o.Image))
 }

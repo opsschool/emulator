@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"log"
 	"net/http"
@@ -20,19 +21,22 @@ import (
 
 // fakeMachine records scripts and answers every Run with exit code 0.
 type fakeMachine struct {
-	mu      sync.Mutex
-	scripts []string
+	mu          sync.Mutex
+	scripts     []string
+	fingerprint string // what the base image was built from
 }
 
-func (f *fakeMachine) Name() string                                    { return "fake" }
-func (f *fakeMachine) BaseReady(context.Context, string) (bool, error) { return true, nil }
-func (f *fakeMachine) Create(context.Context, string) error            { return nil }
-func (f *fakeMachine) Exists(context.Context) (bool, error)            { return true, nil }
-func (f *fakeMachine) CopyIn(context.Context, string, string) error    { return nil }
-func (f *fakeMachine) ShellCommand() []string                          { return nil }
-func (f *fakeMachine) Reboot(context.Context) error                    { return nil }
-func (f *fakeMachine) Delete(context.Context) error                    { return nil }
-func (f *fakeMachine) TelemetryNetwork() string                        { return "" }
+func (f *fakeMachine) Name() string { return "fake" }
+func (f *fakeMachine) Base(context.Context, string) (bool, string, error) {
+	return true, f.fingerprint, nil
+}
+func (f *fakeMachine) Create(context.Context, string) error         { return nil }
+func (f *fakeMachine) Exists(context.Context) (bool, error)         { return true, nil }
+func (f *fakeMachine) CopyIn(context.Context, string, string) error { return nil }
+func (f *fakeMachine) ShellCommand() []string                       { return nil }
+func (f *fakeMachine) Reboot(context.Context) error                 { return nil }
+func (f *fakeMachine) Delete(context.Context) error                 { return nil }
+func (f *fakeMachine) TelemetryNetwork() string                     { return "" }
 func (f *fakeMachine) Run(_ context.Context, script string, _ []string) (vm.Result, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -103,6 +107,26 @@ func TestDaemonAPI(t *testing.T) {
 	if h := post("/hint"); !strings.Contains(h, "not begun") {
 		t.Errorf("hint before begin: %s", h)
 	}
+	page := func() Page {
+		resp, err := http.Get(ln.URL + "/status")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var st Status
+		if err := json.NewDecoder(resp.Body).Decode(&st); err != nil {
+			t.Fatal(err)
+		}
+		return st.Page
+	}
+	s.Spec.Alerts, s.Spec.Summary = []string{"ShopOrderErrors"}, "Orders are failing."
+	if p := page(); p.Summary != "" || len(p.Alerts) != 0 || !p.HasDocs || p.Docs != "" || len(p.Hints) != 0 {
+		t.Errorf("page before the scenario began shows too much: %+v", p)
+	}
+	post("/baseline")
+	if d.st.BaselineEnds.Before(time.Now()) {
+		t.Error("/baseline did not set when the baseline ends")
+	}
 	post("/begin")
 	if !d.st.Begun() {
 		t.Fatal("/begin did not start the scenario")
@@ -121,6 +145,15 @@ func TestDaemonAPI(t *testing.T) {
 	}
 	if h := post("/hint"); !strings.Contains(h, `"hint":""`) {
 		t.Errorf("hints should be exhausted: %s", h)
+	}
+	if p := page(); p.Summary == "" || len(p.Alerts) != 1 || p.Docs == "" || len(p.Hints) != 1 || p.Hints[0] != "look at df" {
+		t.Errorf("page after the hints: %+v", p)
+	}
+	// Another site can't drive the session from the learner's browser.
+	req, _ := http.NewRequest(http.MethodPost, ln.URL+"/hint", nil)
+	req.Header.Set("Origin", "https://evil.example")
+	if resp, err := http.DefaultClient.Do(req); err != nil || resp.StatusCode != http.StatusForbidden {
+		t.Errorf("cross-origin hint: %v %v", resp, err)
 	}
 
 	d.Load.SetProfile(loadgen.Steady(0))
