@@ -4,12 +4,32 @@ Start a production environment in a broken state, debug it with real tools,
 and get graded as you go. A hands-on companion to the
 [Ops School curriculum](https://www.opsschool.org).
 
+## You're on call
+
+You are the SRE at Uncle Wally's Peanut Emporium, an online shop that sells
+peanuts, peanut butter and everything in between to customers who take their
+legumes seriously. The whole business runs on one Linux server: nginx in
+front, the shop's API behind it, a worker that processes paid orders, MySQL
+for the catalog and order history, Redis as a cache, and calls out to a
+payments service run by another team. Wally wrote most of it himself.
+Developers, a security team and a network team keep changing it.
+
+Your job is to keep customers browsing and checking out. When something
+breaks, you get paged: an alert fires, and someone tells you what customers
+are seeing. You have a root shell on the server and the dashboards. Get
+orders flowing again first. Then find what actually broke and fix it, so it
+stays fixed through a restart, a reboot and the next rush of customers.
+Don't lose anyone's order along the way: Wally counts them every night.
+
+Nobody will tell you what's wrong, and whoever made the last change has gone
+home. You have the logs, the metrics and the machine itself.
+
 ```
 opsschool start linux/1.1 --user jdoe
 ```
 
-You get a shell on a VM, a Grafana dashboard with live metrics and logs, and a
-notification as you pass each tier:
+You get a shell on the server, a Grafana dashboard with live metrics and
+logs, and a notification as you pass each tier:
 
 | Tier | Passes when |
 | --- | --- |

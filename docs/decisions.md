@@ -3,6 +3,13 @@
 Changes to [design.md](design.md) and judgment calls made while building.
 Newest first.
 
+## 2026-10-04: The shop is Uncle Wally's Peanut Emporium
+
+The README opens with a setting for new learners: they are the SRE at Uncle
+Wally's Peanut Emporium, on call for its one server. The seeded catalog is
+now peanut products instead of generic goods, so what learners see in the
+database and API matches the story. Product names are not used by any check.
+
 ## 2026-10-04: Renamed from simulator to emulator
 
 The project runs real software on a real machine, so the name is now the

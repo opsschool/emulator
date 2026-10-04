@@ -16,8 +16,9 @@ type SeedSizes struct {
 }
 
 var (
-	adjectives = []string{"Classic", "Compact", "Deluxe", "Eco", "Heavy-duty", "Lightweight", "Modern", "Portable", "Pro", "Rugged", "Smart", "Vintage", "Wireless", "Everyday", "Premium"}
-	nouns      = []string{"Kettle", "Backpack", "Desk Lamp", "Headphones", "Water Bottle", "Notebook", "Chair", "Keyboard", "Mug", "Blender", "Jacket", "Tent", "Speaker", "Monitor Stand", "Toolkit", "Pan", "Umbrella", "Watch", "Charger", "Rug"}
+	// Uncle Wally's Peanut Emporium sells peanuts and little else.
+	adjectives = []string{"Salted", "Unsalted", "Honey-Roasted", "Dry-Roasted", "Smoked", "Cajun", "Chili-Lime", "Garlic", "Maple", "Chocolate-Covered", "Toffee", "Organic", "Jumbo", "Blanched", "Wally's Own"}
+	nouns      = []string{"Peanuts", "Peanuts in the Shell", "Virginia Peanuts", "Valencia Peanuts", "Spanish Peanuts", "Peanut Butter", "Crunchy Peanut Butter", "Peanut Brittle", "Peanut Clusters", "Peanut Butter Cups", "Peanut Butter Fudge", "Peanut Cookies", "Peanut Snack Bars", "Peanut Sauce", "Peanut Oil", "Peanut Flour", "Trail Mix", "Peanut Sampler", "Peanut Gift Tin", "Party Bucket of Peanuts"}
 	firsts     = []string{"Ada", "Ben", "Chen", "Dana", "Eli", "Fatima", "Gus", "Hana", "Ivan", "Jo", "Kai", "Lena", "Mo", "Nia", "Omar", "Priya", "Quinn", "Rosa", "Sam", "Tariq"}
 	lasts      = []string{"Ahmed", "Brown", "Costa", "Diaz", "Evans", "Fischer", "Garcia", "Hughes", "Ito", "Jones", "Khan", "Lopez", "Muller", "Nguyen", "Okafor", "Patel", "Rossi", "Silva", "Tanaka", "Wong"}
 )
@@ -29,7 +30,7 @@ func (s *Store) Seed(ctx context.Context, sz SeedSizes, logf func(string, ...any
 	if err := s.bulk(ctx, "products (sku, name, description, price_cents)", sz.Products, func(i int) []any {
 		name := adjectives[r.IntN(len(adjectives))] + " " + nouns[r.IntN(len(nouns))]
 		return []any{fmt.Sprintf("SKU-%06d", i+1), name,
-			"A " + strings.ToLower(name) + " built to last. Ships in recyclable packaging.",
+			name + ", roasted in small batches and packed the day it ships.",
 			499 + r.IntN(25000)}
 	}, logf); err != nil {
 		return err

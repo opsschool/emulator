@@ -13,6 +13,12 @@ spec".
 Start from something that happens in production and has a clear mitigation
 and a clear fix that are different from each other.
 
+Keep to the setting in the [README](../README.md#youre-on-call): the
+learner is the SRE at Uncle Wally's Peanut Emporium, the shop sells peanuts,
+and changes come from Wally, the developers, the security team, the network
+team or the payments team. Summaries read like what those people would
+say.
+
 `linux/1.1`: someone turned on debug logging to chase a bug and forgot
 to turn it off. The verbose log fills `/data`, which also holds the MySQL
 data directory. Orders fail because MySQL can't write, while browsing keeps

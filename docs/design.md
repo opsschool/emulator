@@ -225,7 +225,7 @@ Question types: `choice` (single answer), `multi` (set of answers) and `text` (e
 
 ## Demo app ("shop")
 
-A small Go service that looks like a real production app. All scenarios break this app or its environment, so contributors only write the fault.
+A small Go service that looks like a real production app: the online shop of Uncle Wally's Peanut Emporium (see the README). All scenarios break this app or its environment, so contributors only write the fault.
 
 Requirements:
 
