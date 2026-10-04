@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -69,6 +70,9 @@ func (v *Verifier) Run(ctx context.Context, say func(string)) (VerifyReport, err
 		if err := v.Machine.Reboot(ctx); err != nil {
 			rep.fail("reboot failed", err.Error())
 		}
+		if v.Load != nil {
+			waitReachable(ctx, v.Load.BaseURL+"/health", time.Minute)
+		}
 	}
 	if d := fv.LoadReplay.Duration; d > 0 && v.Load != nil {
 		say(fmt.Sprintf("Replaying peak load for %s", d))
@@ -124,5 +128,28 @@ func sleep(ctx context.Context, d time.Duration) error {
 		return ctx.Err()
 	case <-t.C:
 		return nil
+	}
+}
+
+// waitReachable polls url until it answers 200 three times in a row, or
+// timeout passes. The shop can be active in the guest before the host's port
+// forward works; requests sent in that gap hang until the client times out,
+// and a replay that starts then is graded on the reboot, not the fix.
+func waitReachable(ctx context.Context, url string, timeout time.Duration) {
+	client := &http.Client{Timeout: 2 * time.Second}
+	deadline := time.Now().Add(timeout)
+	ok := 0
+	for ok < 3 && time.Now().Before(deadline) {
+		ok++
+		resp, err := client.Get(url)
+		if err != nil || resp.StatusCode != http.StatusOK {
+			ok = 0
+		}
+		if resp != nil {
+			resp.Body.Close()
+		}
+		if sleep(ctx, time.Second) != nil {
+			return
+		}
 	}
 }
