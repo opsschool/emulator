@@ -73,6 +73,14 @@ func writeScenario(t *testing.T, overrides map[string]string) string {
 	return dir
 }
 
+func TestTrailingSlash(t *testing.T) {
+	dir := writeScenario(t, nil)
+	s, ps := Validate(dir + "/")
+	if len(ps) != 0 || s.Spec.ID != "linux/1.1" {
+		t.Fatalf("ID %q, problems:\n%v", s.Spec.ID, ps)
+	}
+}
+
 func TestValidStub(t *testing.T) {
 	dir := writeScenario(t, nil)
 	s, ps := Validate(dir)

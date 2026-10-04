@@ -99,17 +99,16 @@ setup_swap() {
 }
 
 # The site resolver: dnsmasq answers for shop.internal on a service-side
-# dummy interface (svc0, 10.53.0.10) and forwards everything else upstream.
-# systemd-resolved uses it for all lookups. networking/1.1 breaks this path.
+# dummy interface (svc0, 10.53.0.10). systemd-resolved sends shop.internal
+# lookups there and everything else to the network's own resolver.
+# networking/1.1 breaks this path.
 configure_site_dns() {
   [[ $mode == container ]] && return # Docker owns resolv.conf; see decisions.md
   log "site dns"
-  local upstream
-  upstream=$(resolvectl dns eth0 | awk '{print $NF}')
   install -m 0644 "$files/svc0.netdev" "$files/svc0.network" /etc/systemd/network/
   networkctl reload
   install -d /etc/dnsmasq.d
-  sed "s/@UPSTREAM@/${upstream:-192.168.5.3}/" "$files/dnsmasq-site.conf" >/etc/dnsmasq.d/site.conf
+  install -m 0644 "$files/dnsmasq-site.conf" /etc/dnsmasq.d/site.conf
   apt-get install -y -q --no-install-recommends dnsmasq
   # dnsmasq only serves the site zone here. Keep the package's helper from handing
   # it a resolv file and registering 127.0.0.1 with resolvconf: both log

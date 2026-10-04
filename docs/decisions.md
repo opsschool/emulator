@@ -115,8 +115,15 @@ rest of the distributed category.
   even 128 workers did not thrash: only the few goroutines handling an order
   touch their buffer, and the active set fit in RAM.
 - Site DNS: dnsmasq on a dummy interface `svc0` (10.53.0.10) is the site
-  resolver, authoritative for `shop.internal`. systemd-resolved uses it via
-  `/etc/systemd/resolved.conf.d/site-dns.conf`. The shop reaches payments as
+  resolver, authoritative for `shop.internal`. systemd-resolved sends
+  `shop.internal` lookups to it via
+  `/etc/systemd/resolved.conf.d/site-dns.conf` and everything else to the
+  network's resolver. (It first sent all lookups through dnsmasq, but on
+  Ubuntu 26.04 Lima's resolver refuses some of what dnsmasq forwards, and
+  dnsmasq logs a warning at every boot that looks like the DNS fault.)
+  dnsmasq forwards anything else asked of it to resolved's stub, and
+  `local=/shop.internal/` keeps it from forwarding `shop.internal` AAAA
+  queries, which would loop back to it. The shop reaches payments as
   `payments.shop.internal:8081`. This replaces "Payments by IP for now". The
   container driver can't do this, because Docker owns `/etc/resolv.conf`; it
   adds the `shop.internal` names as host entries instead, and `net-dns` only

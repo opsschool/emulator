@@ -37,11 +37,17 @@ fi
 echo "==> creating $instance"
 limactl create --tty=false --name "$instance" "$here/lima.yaml"
 # A half-built base must not be mistaken for a good one: delete it unless
-# the build reaches the end, where the ready marker is written.
+# the build reaches the end, where the ready marker is written. Set
+# OPSSCHOOL_KEEP_FAILED=1 to keep it running for debugging; without the
+# marker it is still never used as a base.
 built=false
 cleanup() {
   rm -rf "$build"
   if [[ $built != true ]]; then
+    if [[ ${OPSSCHOOL_KEEP_FAILED:-} == 1 ]]; then
+      echo "==> build failed; keeping $instance for debugging (limactl shell $instance)" >&2
+      return
+    fi
     echo "==> build failed; deleting $instance" >&2
     limactl delete -f "$instance" >/dev/null 2>&1 || true
   fi

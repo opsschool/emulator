@@ -47,6 +47,7 @@ func Load(dir string) (*Scenario, error) {
 
 // load parses everything it can and reports what it could not.
 func load(dir string) (*Scenario, []Problem) {
+	dir = filepath.Clean(dir) // "scenarios/linux/1.1/" from shell completion
 	s := &Scenario{Dir: dir}
 	var ps []Problem
 	add := func(file, format string, args ...any) {
