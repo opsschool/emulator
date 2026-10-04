@@ -94,6 +94,21 @@ GRANT PROCESS, REPLICATION CLIENT, SELECT ON *.* TO 'exporter'@'localhost';
 SQL
 }
 
+# The initrd doesn't need the network: the root disk is local. If the initrd
+# brings the network card up, cloud-init can't rename it to eth0 on a
+# session's first boot (each clone has a new MAC address), and
+# systemd-networkd-wait-online waits its full two minutes for eth0 before
+# the boot goes on. See docs/decisions.md.
+initrd_without_network() {
+  [[ $mode == container ]] && return # no initrd
+  command -v dracut >/dev/null || return
+  log "initrd without networking"
+  cat >/etc/dracut.conf.d/90-opsschool-no-network.conf <<'CONF'
+omit_dracutmodules+=" dyn-netconf network network-legacy network-manager systemd-networkd connman "
+CONF
+  dracut --force --regenerate-all
+}
+
 # Swap, as on most general-purpose hosts. performance/2.1 depends on it.
 setup_swap() {
   [[ $mode == container ]] && return # the container shares the host's memory
@@ -356,6 +371,7 @@ main() {
   setup_data_volume
   configure_mysql
   setup_swap
+  initrd_without_network
   configure_site_dns
   configure_service_segment
   configure_firewall

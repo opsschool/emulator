@@ -28,8 +28,9 @@ type Result struct {
 type Driver interface {
 	// Name is "lima" or "container".
 	Name() string
-	// BaseReady reports whether the base image for an image name is built.
-	BaseReady(ctx context.Context, image string) (bool, error)
+	// Base reports whether the base image for an image name is built, and
+	// the Fingerprint it was built from ("" for builds that predate them).
+	Base(ctx context.Context, image string) (built bool, fingerprint string, err error)
 	// Create makes a fresh session machine from the base image and boots it.
 	Create(ctx context.Context, image string) error
 	// Exists reports whether the session machine exists.

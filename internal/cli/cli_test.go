@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/opsschool/emulator/internal/results"
 	"github.com/opsschool/emulator/internal/scenario"
 )
 
@@ -56,11 +57,26 @@ func TestValidateBroken(t *testing.T) {
 
 func TestList(t *testing.T) {
 	e, out, errb := testEnv(t)
-	if code := Run(e, []string{"list"}); code != 0 {
+	store := results.Open(e.Getenv("OPSSCHOOL_HOME"))
+	for _, r := range []results.Result{
+		{User: "jdoe", Scenario: "linux/1.1", Score: 250, TierPassed: map[string]results.Seconds{"mitigated": 444, "fixed": 988}},
+		{User: "jdoe", Scenario: "linux/1.1", Score: 190, HintsUsed: 1, TierPassed: map[string]results.Seconds{"mitigated": 500, "fixed": 600}},
+	} {
+		store.Append(r)
+	}
+	if code := Run(e, []string{"list", "--user", "jdoe"}); code != 0 {
 		t.Fatalf("exit %d\n%s", code, errb)
 	}
-	if !strings.Contains(out.String(), "linux/1.1") {
-		t.Errorf("list output: %s", out)
+	// The best score is the first run; the fastest fix, and its own
+	// mitigation time, are from the second.
+	var line string
+	for l := range strings.Lines(out.String()) {
+		if strings.HasPrefix(l, "linux/1.1 ") {
+			line = l
+		}
+	}
+	if got := strings.Fields(line); len(got) < 4 || got[1] != "250" || got[len(got)-2] != "10:00" || got[len(got)-1] != "8:20" {
+		t.Errorf("list line: %q\n%s", line, out)
 	}
 }
 

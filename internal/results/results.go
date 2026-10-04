@@ -154,3 +154,39 @@ func Best(rs []Result, user string) map[string]Result {
 	}
 	return out
 }
+
+// Fastest returns each scenario's fastest result for a user: the run with the
+// quickest fix, so its mitigation time is from that same run, not the
+// quickest mitigation of any run. Equal fixes go to the earlier mitigation.
+// When no run fixed a scenario, the quickest mitigation stands in. An empty
+// user matches every user.
+func Fastest(rs []Result, user string) map[string]Result {
+	out := map[string]Result{}
+	for _, r := range rs {
+		if user != "" && r.User != user || !r.Passed(TierMitigated) && !r.Passed(TierFixed) {
+			continue
+		}
+		if b, ok := out[r.Scenario]; !ok || faster(r, b) {
+			out[r.Scenario] = r
+		}
+	}
+	return out
+}
+
+// faster compares fix times first, then mitigation times. A run that never
+// passed a tier is slower than any run that did.
+func faster(a, b Result) bool {
+	for _, t := range []string{TierFixed, TierMitigated} {
+		at, aok := a.TierPassed[t]
+		bt, bok := b.TierPassed[t]
+		switch {
+		case aok && !bok:
+			return true
+		case !aok && bok:
+			return false
+		case aok && at != bt:
+			return at < bt
+		}
+	}
+	return false
+}

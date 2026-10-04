@@ -64,6 +64,19 @@ go build -o bin/opsschool ./cmd/opsschool
 bin/opsschool image build single-node        # run this once, it takes 10-20 minutes
 bin/opsschool list
 bin/opsschool start linux/1.1 --user jdoe
+```
+
+You only build the image once. If you pull changes later that need a new
+image, `opsschool start` tells you and gives you the command to rebuild it.
+
+Once the session has started, open http://127.0.0.1:19999 in your browser.
+Everything you need is on that page: a terminal on the server, the
+dashboards, your progress and the hints. When you think you've fixed things,
+press "Verify my fix".
+
+If you'd rather stay in your own terminal, these commands do the same things:
+
+```
 bin/opsschool shell                          # begin debugging as root in the VM
 bin/opsschool status                         # status, time, hint used
 bin/opsschool hint                           # curriculum link (free), then a hint (-10)
@@ -72,7 +85,7 @@ bin/opsschool quiz                           # optional, not scored
 bin/opsschool stop                           # record the result, tear down
 ```
 
-Dashboards are at http://127.0.0.1:13000 and results go to
+The full Grafana dashboards are at http://127.0.0.1:13000 and results go to
 `~/.opsschool/results.jsonl`.
 
 Without Lima (for example in CI or a VM without nested virtualization),

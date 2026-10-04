@@ -50,6 +50,9 @@ func runTest(e *Env, args []string) error {
 	ctx, cancel := signalContext()
 	defer cancel()
 	env := &session.Env{Home: home, Machine: m, Say: func(s string) { fmt.Fprintln(e.Stdout, "==> "+s) }}
+	if root, err := repoRoot(e); err == nil {
+		env.Fingerprint = imageFingerprint(root, s.Spec.Image)
+	}
 	rep, err := env.TestScenario(ctx, s, *seed)
 	if err != nil {
 		return err
@@ -85,6 +88,10 @@ func runImage(e *Env, args []string) error {
 	if _, err := os.Stat(filepath.Join(imgDir, "provision.sh")); err != nil {
 		return fmt.Errorf("no image %q in %s", image, filepath.Join(root, "images"))
 	}
+	fp, err := vm.Fingerprint(root, image)
+	if err != nil {
+		return err
+	}
 	ctx, cancel := signalContext()
 	defer cancel()
 	switch m.Name() {
@@ -92,16 +99,27 @@ func runImage(e *Env, args []string) error {
 		cmd := exec.CommandContext(ctx, filepath.Join(imgDir, "build.sh"))
 		cmd.Dir = root
 		cmd.Stdout, cmd.Stderr = e.Stdout, e.Stderr
+		cmd.Env = append(os.Environ(), "OPSSCHOOL_IMAGE_FINGERPRINT="+fp)
 		if *orders > 0 {
-			cmd.Env = append(os.Environ(), fmt.Sprintf("SEED_ORDERS=%d", *orders))
+			cmd.Env = append(cmd.Env, fmt.Sprintf("SEED_ORDERS=%d", *orders))
 		}
 		return cmd.Run()
 	default:
 		return vm.BuildContainerBase(ctx, vm.BuildOptions{
 			Root: root, Image: image, Arch: runtime.GOARCH, SeedOrders: *orders,
-			Out: e.Stdout,
+			Fingerprint: fp, Out: e.Stdout,
 		})
 	}
+}
+
+// imageFingerprint is the checkout's fingerprint for an image, or "" (no
+// check) when the image's files aren't there.
+func imageFingerprint(root, image string) string {
+	fp, err := vm.Fingerprint(root, image)
+	if err != nil {
+		return ""
+	}
+	return fp
 }
 
 // repoRoot finds the emulator repository: the parent of the scenarios

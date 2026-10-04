@@ -26,9 +26,12 @@ type State struct {
 	Vars        map[string]string `json:"vars"`
 	// StartedAt is when the scenario began: the break is applied and the
 	// clock runs. Zero during the healthy baseline before it.
-	StartedAt  time.Time     `json:"started_at"`
-	TimeLimit  time.Duration `json:"time_limit"`
-	TargetTime time.Duration `json:"target_time"`
+	StartedAt time.Time `json:"started_at"`
+	// BaselineEnds is when the healthy baseline before the scenario ends,
+	// for the session page's countdown.
+	BaselineEnds time.Time     `json:"baseline_ends,omitzero"`
+	TimeLimit    time.Duration `json:"time_limit"`
+	TargetTime   time.Duration `json:"target_time"`
 	// TierPassed maps a tier to when it passed.
 	TierPassed map[string]time.Time `json:"tier_passed"`
 	// DocsHint is true once the free curriculum hint was shown. HintsUsed

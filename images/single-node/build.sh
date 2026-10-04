@@ -59,6 +59,8 @@ limactl shell "$instance" sudo bash /tmp/opsschool-build/provision.sh /tmp/opssc
 limactl shell "$instance" sudo bash /tmp/opsschool-build/smoke.sh
 limactl shell "$instance" sudo rm -rf /tmp/opsschool-build
 limactl stop "$instance"
-touch "$(limactl list --format '{{.Dir}}' "$instance")/opsschool-ready"
+# The marker holds the fingerprint of the files the image was built from
+# (opsschool image build sets it), so sessions can tell when it's out of date.
+printf '%s\n' "${OPSSCHOOL_IMAGE_FINGERPRINT:-}" >"$(limactl list --format '{{.Dir}}' "$instance")/opsschool-ready"
 built=true
 echo "==> $instance is built and stopped; sessions start from clones of it"

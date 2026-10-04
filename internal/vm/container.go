@@ -22,9 +22,20 @@ func BaseImage(image string) string { return "opsschool/" + image + ":base" }
 func (c *Container) Name() string             { return "container" }
 func (c *Container) TelemetryNetwork() string { return Network }
 
-func (c *Container) BaseReady(ctx context.Context, image string) (bool, error) {
-	res, err := run(ctx, nil, "docker", "image", "inspect", BaseImage(image))
-	return err == nil && res.ExitCode == 0, err
+// FingerprintLabel is the base image label holding its Fingerprint.
+const FingerprintLabel = "org.opsschool.fingerprint"
+
+func (c *Container) Base(ctx context.Context, image string) (bool, string, error) {
+	res, err := run(ctx, nil, "docker", "image", "inspect", "--format",
+		`{{index .Config.Labels "`+FingerprintLabel+`"}}`, BaseImage(image))
+	if err != nil || res.ExitCode != 0 {
+		return false, "", err
+	}
+	fp := strings.TrimSpace(res.Stdout)
+	if fp == "<no value>" {
+		fp = ""
+	}
+	return true, fp, nil
 }
 
 // RunArgs are the docker run flags a systemd machine needs.

@@ -49,3 +49,27 @@ func TestStoreRoundTrip(t *testing.T) {
 		t.Errorf("best overall: %+v", b)
 	}
 }
+
+func TestFastest(t *testing.T) {
+	run := func(user string, tiers map[string]Seconds) Result {
+		return Result{User: user, Scenario: "linux/1.1", TierPassed: tiers}
+	}
+	rs := []Result{
+		run("jdoe", map[string]Seconds{TierMitigated: 60}),                  // quickest mitigation, never fixed
+		run("jdoe", map[string]Seconds{TierMitigated: 300, TierFixed: 900}), // fix
+		run("jdoe", map[string]Seconds{TierMitigated: 400, TierFixed: 700}), // quickest fix
+		run("jdoe", map[string]Seconds{TierMitigated: 200, TierFixed: 700}), // same fix, earlier mitigation
+		run("jdoe", map[string]Seconds{}),                                   // gave up
+		run("other", map[string]Seconds{TierMitigated: 10, TierFixed: 20}),
+	}
+	f := Fastest(rs, "jdoe")["linux/1.1"]
+	if f.TierPassed[TierFixed] != 700 || f.TierPassed[TierMitigated] != 200 {
+		t.Errorf("fastest for jdoe: %+v", f.TierPassed)
+	}
+	if f := Fastest(rs[:1], "jdoe")["linux/1.1"]; f.TierPassed[TierMitigated] != 60 {
+		t.Errorf("no fix yet: %+v", f.TierPassed)
+	}
+	if _, ok := Fastest(rs[4:5], "jdoe")["linux/1.1"]; ok {
+		t.Error("a run that passed nothing has no time")
+	}
+}

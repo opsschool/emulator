@@ -98,14 +98,20 @@ func runStart(e *Env, args []string) error {
 	ctx, cancel := signalContext()
 	defer cancel()
 	say := func(msg string) { fmt.Fprintln(e.Stdout, "==> "+msg) }
-	env := &session.Env{Home: home, Machine: m, Say: say}
+	env := &session.Env{Home: home, Machine: m, Say: say, Fingerprint: imageFingerprint(filepath.Dir(dir), s.Spec.Image)}
 
 	fail := func(err error) error {
 		fmt.Fprintln(e.Stderr, "Setup failed; cleaning up.")
 		env.Teardown(context.Background())
 		return err
 	}
-	if err := env.Bring(ctx, s); err != nil {
+	// Booting is slow and mostly silent, so show a bar while it runs.
+	bar := startProgress(e.Stdout, 90*time.Second)
+	env.Say = bar.Say
+	err = env.Bring(ctx, s)
+	bar.Done()
+	env.Say = say
+	if err != nil {
 		return fail(err)
 	}
 	// The daemon starts load now; it grades and runs the clock only once
@@ -128,10 +134,14 @@ func runStart(e *Env, args []string) error {
 	if err := waitDaemon(ctx); err != nil {
 		return abort(fmt.Errorf("%w (see %s)", err, filepath.Join(session.Dir(home), "daemon.log")))
 	}
-	fmt.Fprintf(e.Stdout, "\nThe shop is up and serving normal traffic. The dashboards are live at\n"+
-		"%s and, for the next %s, show the shop healthy, so you\n"+
-		"have something to compare against once the scenario begins. The clock\n"+
-		"hasn't started yet.\n\n", telemetry.GrafanaURL(), shortDuration(session.Baseline))
+	if err := (session.Client{}).Post("/baseline", nil, nil); err != nil {
+		return abort(err)
+	}
+	fmt.Fprintf(e.Stdout, "\nYour session page is at\n\n  %s\n\n"+
+		"It has a terminal on the server, the dashboards, your progress and hints.\n\n"+
+		"The shop is up and serving normal traffic. For the next %s the\n"+
+		"dashboards show it healthy, so you have something to compare against once\n"+
+		"the scenario begins. The clock hasn't started yet.\n\n", session.PageURL(), shortDuration(session.Baseline))
 	if err := countdown(ctx, e.Stdout, "Scenario begins in", session.Baseline); err != nil {
 		return abort(err)
 	}
@@ -144,6 +154,7 @@ func runStart(e *Env, args []string) error {
 	}
 
 	printPage(e.Stdout, s)
+	fmt.Fprintf(e.Stdout, "Session:    %s\n", session.PageURL())
 	fmt.Fprintf(e.Stdout, "Shell:      opsschool shell\n")
 	fmt.Fprintf(e.Stdout, "Dashboards: %s\n", telemetry.GrafanaURL())
 	fmt.Fprintf(e.Stdout, "Shop:       http://127.0.0.1:%d\n", telemetry.ShopPort)

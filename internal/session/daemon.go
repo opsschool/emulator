@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -24,10 +25,14 @@ import (
 	"github.com/opsschool/emulator/internal/scenario"
 	"github.com/opsschool/emulator/internal/telemetry"
 	"github.com/opsschool/emulator/internal/vm"
+	"github.com/opsschool/emulator/internal/webui"
 )
 
 // ControlAddr is where the daemon serves /metrics and its control API.
 var ControlAddr = fmt.Sprintf("127.0.0.1:%d", telemetry.CLIMetricsPort)
+
+// PageURL is the session page, served by the daemon.
+func PageURL() string { return "http://" + ControlAddr + "/" }
 
 // Daemon runs in the background for the whole session. It drives load,
 // grades the mitigated tier continuously, exports the session metrics, and
@@ -189,6 +194,42 @@ type Status struct {
 	Verifying bool             `json:"verifying"`
 	Mitigated []checks.Outcome `json:"mitigated_checks"`
 	HoldLeft  time.Duration    `json:"hold_left"`
+	Page      Page             `json:"page"`
+}
+
+// Page is what the session page shows about the scenario. The alerts and
+// summary appear once the scenario has begun, as the CLI prints them.
+type Page struct {
+	ID           string        `json:"id"`
+	Level        int           `json:"level"`
+	Alerts       []string      `json:"alerts,omitempty"`
+	Summary      string        `json:"summary,omitempty"`
+	MitigateHold time.Duration `json:"mitigate_hold"`
+	GrafanaURL   string        `json:"grafana_url"`
+	// HasDocs is whether the free curriculum hint exists; Docs is its link
+	// once shown. Hints are the paid hints shown so far, of HintsTotal.
+	HasDocs    bool     `json:"has_docs"`
+	Docs       string   `json:"docs,omitempty"`
+	Hints      []string `json:"hints"`
+	HintsTotal int      `json:"hints_total"`
+}
+
+// page builds the Page. Call with d.mu held.
+func (d *Daemon) page() Page {
+	sp := d.Scenario.Spec
+	p := Page{
+		ID: sp.ID, Level: sp.Level, MitigateHold: sp.MitigateHold.Duration,
+		GrafanaURL: telemetry.GrafanaURL() + "/d/scenario",
+		HasDocs:    sp.Curriculum != "", HintsTotal: len(d.Scenario.Hints),
+		Hints: append([]string{}, d.Scenario.Hints[:min(d.st.HintsUsed, len(d.Scenario.Hints))]...),
+	}
+	if d.st.Begun() {
+		p.Alerts, p.Summary = sp.Alerts, strings.TrimSpace(sp.Summary)
+	}
+	if d.st.DocsHint {
+		p.Docs = sp.Curriculum
+	}
+	return p
 }
 
 func (d *Daemon) handler() http.Handler {
@@ -198,11 +239,18 @@ func (d *Daemon) handler() http.Handler {
 	mux.HandleFunc("GET /status", func(w http.ResponseWriter, r *http.Request) {
 		d.mu.Lock()
 		defer d.mu.Unlock()
-		s := Status{State: d.st, Elapsed: d.st.Elapsed(time.Now()), Verifying: d.verifying, Mitigated: d.lastMit}
+		s := Status{State: d.st, Elapsed: d.st.Elapsed(time.Now()), Verifying: d.verifying, Mitigated: d.lastMit, Page: d.page()}
 		if !d.since.IsZero() && !d.st.Passed(results.TierMitigated) {
 			s.HoldLeft = max(0, d.Scenario.Spec.MitigateHold.Duration-time.Since(d.since)).Truncate(time.Second)
 		}
 		writeJSON(w, s)
+	})
+	mux.HandleFunc("POST /baseline", func(w http.ResponseWriter, r *http.Request) {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+		d.st.BaselineEnds = time.Now().Add(Baseline)
+		d.save()
+		writeJSON(w, d.st)
 	})
 	mux.HandleFunc("POST /begin", func(w http.ResponseWriter, r *http.Request) {
 		d.mu.Lock()
@@ -262,9 +310,51 @@ func (d *Daemon) handler() http.Handler {
 			}
 		}
 		writeJSON(w, res)
-		go func() { time.Sleep(200 * time.Millisecond); d.stop() }()
+		// The session page ends the session itself; `opsschool stop`
+		// tears down after the daemon has gone.
+		teardown := r.URL.Query().Get("teardown") == "1"
+		go func() {
+			time.Sleep(200 * time.Millisecond)
+			if teardown {
+				d.teardown()
+			}
+			d.stop()
+		}()
 	})
-	return mux
+	// The session page. Its files and API answer only on the loopback
+	// address: ExtraListen is for Prometheus, and the page opens a root
+	// shell.
+	mux.Handle("/", webui.Handler(webui.Config{
+		Shell: d.Machine.ShellCommand, PrometheusURL: telemetry.PrometheusURL(), Log: d.Log,
+	}))
+	return guard(mux)
+}
+
+// guard applies webui.LocalOnly to everything but the metrics Prometheus
+// scrapes, which can come from a Docker network.
+func guard(mux http.Handler) http.Handler {
+	local := webui.LocalOnly(mux)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/metrics" || r.URL.Path == "/edge/metrics" {
+			mux.ServeHTTP(w, r)
+			return
+		}
+		local.ServeHTTP(w, r)
+	})
+}
+
+// teardown deletes the scenario machine and stops telemetry, as
+// `opsschool stop` does, when the session page ends the session.
+func (d *Daemon) teardown() {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	env := &Env{Home: d.Home, Machine: d.Machine, Say: func(s string) { d.Log.Print(s) }}
+	if err := env.Teardown(ctx); err != nil {
+		d.Log.Printf("teardown: %v", err)
+	}
+	if err := Clear(d.Home); err != nil {
+		d.Log.Printf("clearing session: %v", err)
+	}
 }
 
 // handleVerify streams progress lines, then a final JSON line with the report.
