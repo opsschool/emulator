@@ -17,6 +17,7 @@ fix_verification:
   load_replay: 180s
 load:
   profile: peak
-mitigate_hold: 180s
+# The mitigated check already looks back over 3 minutes, a full peak cycle.
+mitigate_hold: 60s
 time_limit: 45m
 target_time: 25m

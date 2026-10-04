@@ -17,3 +17,10 @@ net.netfilter.nf_conntrack_max = $OPSSCHOOL_VAR_MAX
 CONF
 sysctl -q -p /etc/sysctl.d/60-kernel-tables.conf
 logger -t maint "SEC-140 stateful firewall, PERF-77 kernel tables applied"
+
+# The table only overflows at peak; wait for the next one.
+since=$(date '+%Y-%m-%d %H:%M:%S')
+for _ in $(seq 48); do
+  journalctl -k -q --no-pager --since "$since" | grep -q 'table full' && break
+  sleep 5
+done

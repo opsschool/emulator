@@ -1,9 +1,9 @@
 mitigated:
-  - name: error rate under 1%
+  - name: error rate stayed under 1% for the last 3 minutes
     type: promql
     expr: >
-      (sum(rate(http_requests_total{code=~"5.."}[1m])) or vector(0))
-      / sum(rate(http_requests_total[1m])) < 0.01
+      max_over_time(((sum(rate(http_requests_total{code=~"5.."}[1m])) or vector(0))
+      / sum(rate(http_requests_total[1m])))[3m:15s]) < 0.01
 fixed:
   - name: the connection tracking table is sized for the host
     type: script
