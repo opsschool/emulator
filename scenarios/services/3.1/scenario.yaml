@@ -1,0 +1,24 @@
+category: services
+image: single-node
+curriculum: https://www.opsschool.org/config_management.html
+alerts:
+  - "ShopOrderErrors: more than 5% of POST /orders requests are failing (5xx)"
+summary: >
+  Checkout is failing again. The on-call engineer found a bad payments
+  address in the shop's configuration an hour ago, corrected it and
+  restarted the shop, and orders came back. A few minutes later they failed
+  again. Browsing works throughout.
+randomize:
+  bad_url:
+    choices:
+      - http://payments-v2.shop.internal:8082
+      - http://payments.shop.internal:9081
+      - http://paygw.shop.internal:8443
+fix_verification:
+  restart: [shop.service, shop-worker.service]
+  reboot: false
+  load_replay: 60s
+# Longer than the sync interval, so a fix that gets reverted can't pass.
+mitigate_hold: 420s
+time_limit: 45m
+target_time: 25m

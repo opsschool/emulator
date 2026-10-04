@@ -1,0 +1,20 @@
+category: networking
+image: single-node
+curriculum: https://www.opsschool.org/networking_101.html
+alerts:
+  - "ShopOrderErrors: more than 5% of POST /orders requests are failing (5xx)"
+summary: >
+  Checkout is failing; browsing works. The payments team says their host is
+  up and healthy and they can reach everything from it, but they see few or
+  no requests from the shop. The network team finished some work on the
+  service segment last night.
+randomize:
+  variant:
+    choices: [pinned, duplicate]
+fix_verification:
+  restart: [shop.service]
+  reboot: true
+  load_replay: 120s
+mitigate_hold: 180s
+time_limit: 45m
+target_time: 25m

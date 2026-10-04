@@ -144,6 +144,9 @@ func (v *validator) spec() {
 			v.errf(f, 0, "load.schedule[%d]: rps must be >= 0 and duration > 0", i)
 		}
 	}
+	if sp.Load.NewConnections < 0 || sp.Load.NewConnections > 1 {
+		v.errf(f, 0, "load.new_connections must be between 0 and 1")
+	}
 }
 
 func (v *validator) files() {
@@ -155,8 +158,15 @@ func (v *validator) files() {
 		}
 		v.shellScript(name, string(b))
 	}
-	if len(v.s.Hints) == 0 {
-		v.warnf(FileHints, "no hints; add ordered hints separated by \"---\" lines")
+	// Learners get the curriculum link free, then one hint that costs points.
+	switch {
+	case len(v.s.Hints) == 0:
+		v.warnf(FileHints, "no hint; write one that points the way without giving the answer")
+	case len(v.s.Hints) > 1:
+		v.errf(FileHints, 0, "%d hints; write one (learners get the curriculum link first, for free)", len(v.s.Hints))
+	}
+	if v.s.Spec.Curriculum == "" {
+		v.warnf(FileScenario, "no curriculum link; the free first hint points there")
 	}
 	if _, err := os.Stat(v.s.Path(FileSolution)); err != nil {
 		v.warnf(FileSolution, "no solution writeup")
@@ -278,7 +288,7 @@ var breakRules = []struct {
 	{"ssh", "touches SSH, which the harness uses", regexp.MustCompile(`\bsshd?\b|\bdport 22\b|:22\b`)},
 	{"exporters", "touches an exporter", regexp.MustCompile(`node_exporter|node-exporter|process-exporter|mysqld_exporter|mysqld-exporter|redis_exporter|redis-exporter|\b91(00|04|21)\b|\b9256\b`)},
 	{"alloy", "touches Grafana Alloy (log shipping)", regexp.MustCompile(`\balloy\b`)},
-	{"harness", "touches harness files", regexp.MustCompile(`/opt/opsschool|/etc/opsschool|/var/lib/opsschool`)},
+	{"harness", "touches harness files", regexp.MustCompile(`/opt/opsschool|/etc/opsschool|/var/lib/opsschool|/run/opsschool`)},
 }
 
 func (v *validator) breakScript() {

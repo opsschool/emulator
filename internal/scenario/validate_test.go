@@ -41,7 +41,7 @@ fixed:
   type: text
   answer_from_var: name
 `,
-	FileHints:    "one\n---\ntwo\n",
+	FileHints:    "one\n",
 	FileSolution: "# Stub\n",
 }
 
@@ -87,7 +87,7 @@ func TestValidStub(t *testing.T) {
 	if len(ps) != 0 {
 		t.Fatalf("expected no problems, got:\n%v", ps)
 	}
-	if len(s.Hints) != 2 || s.Spec.MitigateHold.Seconds() != 60 || s.Spec.TimeLimit.Minutes() != 45 {
+	if len(s.Hints) != 1 || s.Spec.MitigateHold.Seconds() != 60 || s.Spec.TimeLimit.Minutes() != 45 {
 		t.Errorf("defaults or hints not applied: %+v, hints=%q", s.Spec, s.Hints)
 	}
 }
@@ -137,6 +137,7 @@ func TestBrokenScenarios(t *testing.T) {
 		{"wrong category dir", replace(FileScenario, "category: linux", "category: databases"), "move it to scenarios/databases/1.1"},
 		{"level in file", replace(FileScenario, "image: single-node", "image: single-node\nlevel: 1"), "field level not found"},
 		{"no summary", replace(FileScenario, "summary: Something is wrong.", ""), "summary is required"},
+		{"two hints", replace(FileHints, "one\n", "one\n---\ntwo\n"), "2 hints; write one"},
 		{"bad curriculum", replace(FileScenario, "https://ops-school.readthedocs.io/", "chapter 3"), "curriculum must be an http(s) URL"},
 		{"unknown field", replace(FileScenario, "image: single-node", "image: single-node\nimgae: x"), "field imgae not found"},
 		{"bad duration", replace(FileScenario, "image: single-node", "image: single-node\ntime_limit: soon"), `invalid duration "soon"`},

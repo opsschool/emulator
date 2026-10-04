@@ -1,0 +1,23 @@
+category: performance
+image: single-node
+curriculum: https://www.opsschool.org/capacity_planning.html
+alerts:
+  - "ShopLatency: p99 latency above 80ms for 10m"
+summary: >
+  The shop has been slow since this morning, worst at busy moments. The
+  dashboards say the server is mostly idle, so the developers think it's the
+  network. Finance rolled out its cost-control changes overnight.
+randomize:
+  slice:
+    choices: [apps, workloads, platform]
+  quota:
+    choices: ["4", "5", "6"]
+fix_verification:
+  restart: [shop.service, shop-worker.service]
+  reboot: true
+  load_replay: 180s
+load:
+  profile: peak
+mitigate_hold: 120s
+time_limit: 45m
+target_time: 25m

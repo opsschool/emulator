@@ -3,6 +3,85 @@
 Changes to [design.md](design.md) and judgment calls made while building.
 Newest first.
 
+## 2026-10-04: Hints: the curriculum first, free; then one paid hint
+
+From the project owner. The first `opsschool hint` points at the scenario's
+`curriculum` link and costs nothing. The second shows the scenario's one
+hint, which costs `HintPenalty` (10 points) and points the way without
+giving the answer. There are no more after that. `hints.md` holds exactly
+one hint (more is a validation error), and `opsschool list` has a HINT
+column saying whether the best result used it. Results record the free
+hint as `docs_hint`, unscored.
+
+Most linked curriculum chapters don't cover their scenario's topic yet;
+the curriculum is improved alongside the scenarios.
+
+## 2026-10-04: An edge load balancer, played by the load generator
+
+Some faults drop connections before they reach the shop, so the shop's
+metrics never see them (networking/3.1). A real site would see them at its
+load balancer. The load generator now records every result as one would:
+`edge_requests_total{route,code}` and `edge_request_duration_seconds`,
+scraped as job `edge`, and an nginx-style access log in Loki
+(`{job="edge"}`). Requests that got no response count as 504 (timeout) or
+502 (refused, reset). The session daemon serves the metrics; `opsschool
+test` serves them itself. The dashboard has an Edge row and an edge error
+log panel. This replaces `opsschool_loadgen_requests_total`, whose name
+gave away the harness.
+
+`load.new_connections` sets the share of requests sent on a fresh
+connection, as first visits from new customers would be. It defaults to 0
+(reuse connections), so existing scenarios are unchanged.
+
+## 2026-10-04: The harness works on a full disk
+
+Scenario scripts used to be staged in `/tmp` and copied to
+`/var/lib/opsschool` on the root disk, so once services/4.1 filled `/`
+every check and fix script failed to copy. Copies now stage in `/dev/shm`
+and scripts run from `/run/opsschool`, both in memory. Check state stays in
+`/var/lib/opsschool/state`; it is written once, before the break.
+
+## 2026-10-04: Image additions for the first L3–L4 scenarios
+
+- **Payments on its own layer-2 segment (Lima only).** `shop-payments` runs
+  in network namespace `pay1` (10.54.0.20, MAC 52:54:00:36:00:14), cabled
+  to bridge `br-svc` (10.54.0.1, managed by systemd-networkd), and DNS
+  points `payments.shop.internal` there. The shop now reaches payments as a
+  real neighbor over ARP, which networking/3.2 needs. The container driver
+  keeps payments on loopback. networking/1.1's `/etc/hosts` mitigation pins
+  the new address.
+- **A thumbnail sidecar.** `shop-thumbs` (a small Python service) makes
+  thumbnails from photos in `/data/uploads/queue`. 1.4.2 runs; 1.5.0, with
+  a scratch-file bug, sits in `/usr/local/lib/shop-builds` for services/4.1.
+- **Tools:** `arping` and `conntrack`.
+- `svc0` and `br-svc` are not required for network-online. Waiting for them
+  logged an error-level timeout at every boot that looked like a network
+  fault.
+
+## 2026-10-04: L3–L4 ideas tried and shelved
+
+- **Order ID overflow:** `orders.id` is already BIGINT, and the only
+  mitigation is the fix, so the tiers would be the same.
+- **Thread limit (`TasksMax`):** at this load neither the shop nor MySQL
+  needs more than a thread or two beyond its idle count, because requests
+  take about 2 ms. A limit low enough to bite at peak also breaks unrelated
+  things at idle. Worth revisiting if the workload gains real concurrency.
+- **Redis refusing writes after core dumps fill the disk:** systemd-coredump
+  stops with less than one core's worth of space left, and Redis's snapshot
+  fits in that. services/4.1 fills the disk with a scratch file instead,
+  which writes until ENOSPC, and the incident became MySQL going down.
+
+## 2026-10-04: Checkout takes a lock in Redis
+
+Before this, the shop used Redis only as a cache, and every Redis error fell
+back to MySQL, so no fault in Redis could hurt customers. Checkout now takes
+a ten-second per-customer lock in Redis (`SET lock:checkout:<id> NX`), so a
+double-clicked "Place order" can't charge twice. It fails closed: if Redis
+can't take the lock, the order fails. That makes scenarios about Redis
+possible (Redis refusing writes, evicting keys, a slow Redis). A request
+that finds the lock held gets 409; the load generator's customers rarely
+collide.
+
 ## 2026-10-04: The shop is Uncle Wally's Peanut Emporium
 
 The README opens with a setting for new learners: they are the SRE at Uncle

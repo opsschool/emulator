@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Brings up the payments host on the service segment: a network namespace,
+# pay1, with eth0 at 10.54.0.20, cabled to the br-svc bridge.
+set -euo pipefail
+ns=pay1
+for _ in $(seq 20); do
+  ip link show br-svc >/dev/null 2>&1 && break
+  sleep 0.5
+done
+[[ -e /run/netns/$ns ]] || ip netns add "$ns"
+if ! ip link show veth-pay1 >/dev/null 2>&1; then
+  ip link add veth-pay1 type veth peer name eth0 netns "$ns"
+fi
+ip -n "$ns" link set eth0 address 52:54:00:36:00:14
+ip link set veth-pay1 master br-svc up
+ip -n "$ns" addr replace 10.54.0.20/24 dev eth0
+ip -n "$ns" link set lo up
+ip -n "$ns" link set eth0 up
+ip -n "$ns" route replace default via 10.54.0.1

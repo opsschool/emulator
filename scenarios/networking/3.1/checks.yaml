@@ -1,0 +1,26 @@
+# The shop never sees the dropped connections, so judge by what the load
+# balancer in front of it saw. The 2-minute lookback plus the 90s hold spans
+# a full 3-minute peak cycle.
+mitigated:
+  - name: customers saw under 1% errors for the last 2 minutes
+    type: promql
+    expr: >
+      max_over_time(((sum(rate(edge_requests_total{code=~"5.."}[30s])) or vector(0))
+      / sum(rate(edge_requests_total[30s])))[90s:15s]) < 0.01
+fixed:
+  - name: the connection tracking table is sized for the host
+    type: script
+    run: checks/conntrack_ok.sh
+  # Fix verification replays 3 minutes of peak load after the reboot; this
+  # window (2m plus a 30s rate) stays inside the replay.
+  - name: customers' p99 latency stayed under 500ms for the last 2 minutes
+    type: promql
+    expr: >
+      max_over_time((histogram_quantile(0.99, sum by (le) (rate(edge_request_duration_seconds_bucket[30s]))))[2m:15s]) < 0.5
+  - name: the firewall still drops invalid packets
+    type: script
+    run: checks/firewall_ok.sh
+preserve:
+  - name: no orders lost
+    type: script
+    run: checks/orders_preserved.sh

@@ -1,0 +1,1 @@
+Space that `du` can't find is either in deleted files still held open, or in files it can't see. `lsof +L1` rules out the first. A mount hides whatever was in its directory before it was mounted; what was mounted during the maintenance?

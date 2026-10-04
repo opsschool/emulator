@@ -1,0 +1,22 @@
+- id: what
+  prompt: What stopped mysqld from writing to its new temporary directory?
+  type: choice
+  choices:
+    - Unix file permissions
+    - The AppArmor profile that confines mysqld
+    - The data volume was mounted read-only
+    - SELinux
+  answer: 1
+- id: dir
+  prompt: What was the new temporary directory?
+  type: text
+  answer_from_var: tmpdir
+- id: complain
+  prompt: Why is switching mysqld's profile to complain mode, or unloading it, only a mitigation?
+  type: choice
+  choices:
+    - It is a fine fix
+    - MySQL loses the confinement that limits the damage if it is ever compromised, and an unloaded profile comes back at the next boot
+    - It makes MySQL slower
+    - AppArmor can't be changed at runtime
+  answer: 1

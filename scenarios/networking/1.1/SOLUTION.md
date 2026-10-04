@@ -12,7 +12,7 @@ shop's error only says the call timed out, after five seconds:
     Post "http://payments.shop.internal:8081/authorize": context deadline exceeded
 
 The time goes to the lookup, not the connection: `dig
-payments.shop.internal` hangs, while `curl http://127.0.0.1:8081/health`
+payments.shop.internal` hangs, while `curl http://10.54.0.20:8081/health`
 answers at once.
 
 `/etc/resolv.conf` points at systemd-resolved's local stub (127.0.0.53),

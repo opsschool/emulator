@@ -73,7 +73,9 @@ func NewGenerator(s *scenario.Scenario) (*loadgen.Generator, error) {
 	if err != nil {
 		return nil, err
 	}
-	return loadgen.New(fmt.Sprintf("http://127.0.0.1:%d", telemetry.ShopPort), p), nil
+	g := loadgen.New(fmt.Sprintf("http://127.0.0.1:%d", telemetry.ShopPort), p)
+	g.NewConnShare = s.Spec.Load.NewConnections
+	return g, nil
 }
 
 // Bring up the telemetry stack and a fresh machine for the scenario.
@@ -137,7 +139,7 @@ const Baseline = 2 * time.Minute
 // RunScript copies one of the scenario's scripts into the machine, runs it
 // as root with the session environment, and removes it.
 func RunScript(ctx context.Context, m vm.Driver, s *scenario.Scenario, name string, env []string) error {
-	remote := "/var/lib/opsschool/run/" + filepath.Base(name)
+	remote := checks.ScriptDir + "/run/" + filepath.Base(name)
 	if err := m.CopyIn(ctx, s.Path(name), remote); err != nil {
 		return err
 	}

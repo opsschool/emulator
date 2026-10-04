@@ -43,11 +43,24 @@ func runList(e *Env, args []string) error {
 		}
 	}
 	tw := tabwriter.NewWriter(e.Stdout, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(tw, "ID\tBEST")
+	fmt.Fprintln(tw, "ID\tBEST\tHINT")
 	for _, s := range scs {
-		fmt.Fprintf(tw, "%s\t%s\n", s.Spec.ID, bestLabel(best, s.Spec.ID))
+		fmt.Fprintf(tw, "%s\t%s\t%s\n", s.Spec.ID, bestLabel(best, s.Spec.ID), hintLabel(best, s.Spec.ID))
 	}
 	return tw.Flush()
+}
+
+// hintLabel says whether the best result used the paid hint. The free
+// curriculum hint doesn't count.
+func hintLabel(best map[string]results.Result, id string) string {
+	r, ok := best[id]
+	switch {
+	case !ok:
+		return "-"
+	case r.HintsUsed > 0:
+		return "yes"
+	}
+	return "no"
 }
 
 func bestLabel(best map[string]results.Result, id string) string {

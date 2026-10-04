@@ -56,8 +56,9 @@ func TestDaemonAPI(t *testing.T) {
 			Mitigated: []scenario.Check{{Type: scenario.CheckHTTP, URL: shop.URL, ExpectStatus: 200}},
 			Fixed:     []scenario.Check{{Type: scenario.CheckPromQL, Expr: "up < 2"}},
 		},
-		Hints: []string{"look at df", "look at the log level"},
+		Hints: []string{"look at df"},
 	}
+	s.Spec.Curriculum = "https://www.opsschool.org/filesystems_101.html"
 	s.Spec.MitigateHold.Duration = 0
 	s.Spec.FixVerification.Restart = []string{"shop.service"}
 
@@ -111,10 +112,13 @@ func TestDaemonAPI(t *testing.T) {
 	if !d.st.Passed(results.TierMitigated) {
 		t.Fatal("mitigated should have passed")
 	}
-	if h := post("/hint"); !strings.Contains(h, "look at df") {
-		t.Errorf("first hint: %s", h)
+	// The curriculum comes first and is free; then the paid hint.
+	if h := post("/hint"); !strings.Contains(h, "filesystems_101") || d.st.HintsUsed != 0 || !d.st.DocsHint {
+		t.Errorf("first hint should be the free curriculum link: %s (used %d)", h, d.st.HintsUsed)
 	}
-	post("/hint")
+	if h := post("/hint"); !strings.Contains(h, "look at df") {
+		t.Errorf("second hint: %s", h)
+	}
 	if h := post("/hint"); !strings.Contains(h, `"hint":""`) {
 		t.Errorf("hints should be exhausted: %s", h)
 	}
@@ -130,11 +134,11 @@ func TestDaemonAPI(t *testing.T) {
 		t.Errorf("restart not run: %q", m.scripts)
 	}
 
-	if out := post("/stop"); !strings.Contains(out, `"score":80`) {
+	if out := post("/stop"); !strings.Contains(out, `"score":90`) {
 		t.Errorf("stop result: %s", out)
 	}
 	rs, _ := results.Open(home).All()
-	if len(rs) != 1 || rs[0].HintsUsed != 2 {
+	if len(rs) != 1 || rs[0].HintsUsed != 1 || !rs[0].DocsHint {
 		t.Errorf("results: %+v", rs)
 	}
 }

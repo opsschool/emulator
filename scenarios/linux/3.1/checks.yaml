@@ -1,0 +1,20 @@
+mitigated:
+  - name: the root disk has at least 10% free
+    type: promql
+    expr: >
+      node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"} > 0.10
+  - name: health endpoint is up
+    type: http
+    url: http://{{vm}}/health
+    expect_status: 200
+fixed:
+  - name: the shop won't start without its data volume
+    type: script
+    run: checks/ordering_ok.sh
+  - name: nothing is left under the data volume's mountpoint
+    type: script
+    run: checks/hidden_ok.sh
+preserve:
+  - name: no orders lost
+    type: script
+    run: checks/orders_preserved.sh

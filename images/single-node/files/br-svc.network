@@ -1,0 +1,9 @@
+[Match]
+Name=br-svc
+
+[Link]
+RequiredForOnline=no
+
+[Network]
+Address=10.54.0.1/24
+ConfigureWithoutCarrier=yes

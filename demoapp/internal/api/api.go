@@ -182,6 +182,16 @@ func (s *Server) createOrder(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := s.ctx(r)
 	defer cancel()
+	release, err := s.Cache.Lock(ctx, fmt.Sprintf("checkout:%d", req.CustomerID), 10*time.Second)
+	if errors.Is(err, cache.ErrLocked) {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "a checkout for this customer is already in progress"})
+		return
+	}
+	if err != nil {
+		s.fail(w, r, fmt.Errorf("checkout lock: %w", err))
+		return
+	}
+	defer release()
 	// Authorize an estimate first; the real total is computed from the
 	// catalog price inside the order transaction.
 	// Checkout keeps its state in a session file, as many web frameworks

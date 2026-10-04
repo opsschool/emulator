@@ -1,0 +1,22 @@
+- id: layer
+  prompt: At which layer was traffic to payments going wrong?
+  type: choice
+  choices:
+    - DNS
+    - "Layer 2: the MAC address used for the payments host's IP"
+    - The firewall
+    - TLS
+  answer: 1
+- id: variant
+  prompt: What gave the machine the wrong MAC address? Answer "pinned" for a static entry, or "duplicate" for another host with the same IP.
+  type: text
+  answer_from_var: variant
+- id: flush
+  prompt: Why isn't flushing the ARP entry enough?
+  type: choice
+  choices:
+    - It is enough
+    - The source of the wrong address is still there, a static entry in the network configuration or another host answering for the IP, and it comes back
+    - ARP entries can't be flushed
+    - It breaks DNS
+  answer: 1

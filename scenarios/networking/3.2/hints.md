@@ -1,0 +1,1 @@
+The payments host answers on its own side but not from the shop's machine. On the same network, packets go to a MAC address the machine learned with ARP. Compare what the shop's machine thinks payments' MAC is (`ip neigh show`) with the real one (`ip -n pay1 link show eth0`).

@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"strconv"
 	"sync"
 	"time"
 
@@ -19,6 +18,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/opsschool/emulator/internal/checks"
+	"github.com/opsschool/emulator/internal/edge"
 	"github.com/opsschool/emulator/internal/loadgen"
 	"github.com/opsschool/emulator/internal/results"
 	"github.com/opsschool/emulator/internal/scenario"
@@ -39,6 +39,9 @@ type Daemon struct {
 	Scenario *scenario.Scenario
 	Engine   *checks.Engine
 	Load     *loadgen.Generator
+	// Edge records the load generator's results as the shop's load
+	// balancer. Optional; Run creates one that logs to the local Loki.
+	Edge *edge.Edge
 	// ExtraListen is another address to serve metrics on, so Prometheus
 	// can reach it from a Docker network. Optional.
 	ExtraListen string
@@ -50,11 +53,10 @@ type Daemon struct {
 	lastMit   []checks.Outcome
 	stop      context.CancelFunc
 
-	reg      *prometheus.Registry
-	passed   *prometheus.GaugeVec
-	elapsed  prometheus.Gauge
-	hints    prometheus.Gauge
-	requests *prometheus.CounterVec
+	reg     *prometheus.Registry
+	passed  *prometheus.GaugeVec
+	elapsed prometheus.Gauge
+	hints   prometheus.Gauge
 }
 
 // Run runs the daemon until the session is stopped or ctx ends.
@@ -83,9 +85,8 @@ func (d *Daemon) Run(ctx context.Context) error {
 	}
 	defer srv.Close()
 
-	d.Load.OnResult = func(route string, code int) {
-		d.requests.WithLabelValues(route, strconv.Itoa(code)).Inc()
-	}
+	go d.Edge.Run(ctx)
+	d.Load.OnResult = d.Edge.Observe
 	go d.Load.Run(ctx)
 
 	d.Log.Printf("session started: %s as %s", st.ScenarioID, st.User)
@@ -106,8 +107,10 @@ func (d *Daemon) setupMetrics() {
 	d.passed = prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "opsschool_check_passed", Help: "1 when the tier has passed."}, []string{"scenario", "tier"})
 	d.elapsed = prometheus.NewGauge(prometheus.GaugeOpts{Name: "opsschool_session_elapsed_seconds", Help: "Seconds since the session started."})
 	d.hints = prometheus.NewGauge(prometheus.GaugeOpts{Name: "opsschool_hints_used", Help: "Hints revealed so far."})
-	d.requests = prometheus.NewCounterVec(prometheus.CounterOpts{Name: "opsschool_loadgen_requests_total", Help: "Load generator requests by route and status code (0 = transport error)."}, []string{"route", "code"})
-	d.reg.MustRegister(d.passed, d.elapsed, d.hints, d.requests)
+	d.reg.MustRegister(d.passed, d.elapsed, d.hints)
+	if d.Edge == nil {
+		d.Edge = edge.New(fmt.Sprintf("http://127.0.0.1:%d", telemetry.LokiPort))
+	}
 	d.syncMetrics()
 }
 
@@ -191,6 +194,7 @@ type Status struct {
 func (d *Daemon) handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("GET /metrics", promhttp.HandlerFor(d.reg, promhttp.HandlerOpts{}))
+	mux.Handle("GET /edge/metrics", promhttp.HandlerFor(d.Edge.Registry, promhttp.HandlerOpts{}))
 	mux.HandleFunc("GET /status", func(w http.ResponseWriter, r *http.Request) {
 		d.mu.Lock()
 		defer d.mu.Unlock()
@@ -214,15 +218,23 @@ func (d *Daemon) handler() http.Handler {
 	mux.HandleFunc("POST /hint", d.begun(func(w http.ResponseWriter, r *http.Request) {
 		d.mu.Lock()
 		defer d.mu.Unlock()
-		if d.st.HintsUsed >= len(d.Scenario.Hints) {
-			writeJSON(w, map[string]any{"hint": "", "index": d.st.HintsUsed, "total": len(d.Scenario.Hints)})
+		total := len(d.Scenario.Hints)
+		// The first hint is free: where the curriculum covers the topic.
+		if url := d.Scenario.Spec.Curriculum; url != "" && !d.st.DocsHint {
+			d.st.DocsHint = true
+			d.addEvent("Curriculum hint shown.")
+			writeJSON(w, map[string]any{"docs": url, "total": total})
+			return
+		}
+		if d.st.HintsUsed >= total {
+			writeJSON(w, map[string]any{"hint": "", "index": d.st.HintsUsed, "total": total})
 			return
 		}
 		h := d.Scenario.Hints[d.st.HintsUsed]
 		d.st.HintsUsed++
 		d.addEvent(fmt.Sprintf("Hint %d revealed.", d.st.HintsUsed))
 		d.syncMetrics()
-		writeJSON(w, map[string]any{"hint": h, "index": d.st.HintsUsed, "total": len(d.Scenario.Hints)})
+		writeJSON(w, map[string]any{"hint": h, "index": d.st.HintsUsed, "total": total})
 	}))
 	mux.HandleFunc("POST /quiz", d.begun(func(w http.ResponseWriter, r *http.Request) {
 		var q results.QuizResult

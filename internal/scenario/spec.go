@@ -69,6 +69,10 @@ type FixVerification struct {
 type LoadSpec struct {
 	Profile  string     `yaml:"profile"`
 	Schedule []RateStep `yaml:"schedule"`
+	// NewConnections is the share of requests (0 to 1) sent on a fresh
+	// connection instead of a reused one. 0, the default, reuses
+	// connections wherever possible.
+	NewConnections float64 `yaml:"new_connections"`
 }
 
 // RateStep is one step of a custom load schedule: RPS requests per second

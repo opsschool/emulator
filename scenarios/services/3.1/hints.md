@@ -1,0 +1,1 @@
+Your fix keeps getting undone. Find exactly when checkout broke again and read the journal just before it: something rewrote the configuration and restarted the shop. `systemctl list-timers` lists what runs on a schedule. Follow it to where the configuration comes from.

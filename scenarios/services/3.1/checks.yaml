@@ -1,0 +1,17 @@
+mitigated:
+  - name: order error rate under 1%
+    type: promql
+    expr: >
+      (sum(rate(http_requests_total{route="POST /orders",code=~"5.."}[1m])) or vector(0))
+      / sum(rate(http_requests_total{route="POST /orders"}[1m])) < 0.01
+fixed:
+  - name: the configuration source has a working payments address
+    type: script
+    run: checks/source_ok.sh
+  - name: configuration sync is still running
+    type: script
+    run: checks/sync_ok.sh
+preserve:
+  - name: no orders lost
+    type: script
+    run: checks/orders_preserved.sh

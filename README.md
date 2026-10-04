@@ -51,8 +51,8 @@ bin/opsschool image build single-node        # once, 10-20 minutes
 bin/opsschool list
 bin/opsschool start linux/1.1 --user jdoe
 bin/opsschool shell                          # debug as root in the VM
-bin/opsschool status                         # tiers, time, hints
-bin/opsschool hint                           # -10 points each
+bin/opsschool status                         # tiers, time, hint used
+bin/opsschool hint                           # curriculum link (free), then a hint (-10)
 bin/opsschool verify                         # claim a fix
 bin/opsschool quiz                           # optional, not scored
 bin/opsschool stop                           # record the result, tear down

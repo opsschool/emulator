@@ -1,0 +1,1 @@
+The load balancer sees failures that never reach the shop, so packets are lost on the way in. Failures only happen at peak, and failed requests take about 10 seconds. The kernel logs when it drops packets: look at `journalctl -k` around a peak.

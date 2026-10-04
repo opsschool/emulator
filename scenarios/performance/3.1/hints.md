@@ -1,0 +1,1 @@
+The host has idle CPU, but is the shop allowed to use it? systemd groups units into slices, and a slice can carry limits. `systemd-cgls` shows the tree; the kernel counts every time it holds a group back in `cpu.stat` (`nr_throttled`) under `/sys/fs/cgroup`.

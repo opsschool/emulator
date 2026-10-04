@@ -116,8 +116,8 @@ CONTRIBUTING.md
 | `opsschool list` | List scenario IDs and the learner's best result. |
 | `opsschool start <id> --user <name>` | Boot the VM, start the telemetry stack, apply the break, start load. Print the shell command and Grafana URL. Start the timer. |
 | `opsschool shell` | Open a shell in the running scenario VM. |
-| `opsschool status` | Show each tier's state, elapsed time and hints used. |
-| `opsschool hint` | Reveal the next hint. Recorded for scoring. |
+| `opsschool status` | Show each tier's state, elapsed time and whether the hint was used. |
+| `opsschool hint` | First call: point to the curriculum chapter, free. Second call: reveal the scenario's one hint, recorded for scoring. |
 | `opsschool verify` | Learner claims a fix. Run fix verification: restart the service, reboot if the scenario requires it, replay load, then evaluate the `fixed` checks. |
 | `opsschool quiz` | Answer the scenario's optional quiz questions. |
 | `opsschool stop` | Tear down the VM and telemetry stack. Write the final result. |
@@ -142,7 +142,7 @@ scenarios/networking/4.1/
   mitigate.sh       reference mitigation (CI only, never shown to learners)
   solve.sh          reference fix (CI only)
   questions.yaml    optional quiz questions
-  hints.md          ordered hints, separated by "---"
+  hints.md          one hint, shown after the free curriculum link
   dashboard.json    optional extra Grafana panels
   SOLUTION.md       writeup, links to the curriculum chapter
 ```
@@ -269,11 +269,12 @@ How faults are injected:
 The base dashboard is in every scenario and has these rows:
 
 1. **Tier status:** `opsschool_check_passed{tier}` for each tier, plus elapsed time.
-2. **Service (RED):** request rate, error rate and latency percentiles by route.
-3. **Host (USE):** CPU, memory, swap, disk space and inodes, disk I/O and iowait, network, load.
-4. **MySQL:** connections, threads running, queries per second, slow queries, InnoDB row lock waits, replica lag.
-5. **Redis:** memory, hit rate, connected clients.
-6. **Logs:** app and system logs from Loki.
+2. **Edge:** what customers see at the load balancer: requests by status, error rate, latency.
+3. **Service (RED):** request rate, error rate and latency percentiles by route.
+4. **Host (USE):** CPU, memory, swap, disk space and inodes, disk I/O and iowait, network, load.
+5. **MySQL:** connections, threads running, queries per second, slow queries, InnoDB row lock waits, replica lag.
+6. **Redis:** memory, hit rate, connected clients.
+7. **Logs:** edge errors, app and system logs from Loki.
 
 The CLI exposes its own metrics endpoint that Prometheus scrapes: `opsschool_check_passed{scenario,tier}` (0 or 1), `opsschool_session_elapsed_seconds` and `opsschool_hints_used`.
 
@@ -283,16 +284,18 @@ The CLI exposes its own metrics endpoint that Prometheus scrapes: `opsschool_che
 - Steady mixed traffic by default (browse, view product, place order), at a rate the single-node image handles comfortably.
 - Scenarios can set a load profile in `scenario.yaml`: `steady`, `peak` (periodic bursts) or a custom rate schedule.
 - `load_replay` during fix verification runs the scenario's profile at peak for the configured duration.
+- `load.new_connections` (0 to 1) sends that share of requests on a fresh connection; the rest reuse idle ones.
+- The generator stands in for the edge load balancer: it exports `edge_requests_total` and `edge_request_duration_seconds` (job `edge`) and ships an access log to Loki (`{job="edge"}`). Requests that get no response are recorded as 502 or 504, as a load balancer would return them.
 
 ## Results and scoring
 
-- Results are appended to `~/.opsschool/results.jsonl`: username, scenario ID, seed, start and end times, per-tier pass times, hints used, and whether fix verification caused data loss.
-- Suggested score per scenario: 100 points per tier passed, minus 10 per hint, with a time bonus for passing under a scenario's target time. Keep the formula in one place so it can change.
+- Results are appended to `~/.opsschool/results.jsonl`: username, scenario ID, seed, start and end times, per-tier pass times, whether the free curriculum hint and the paid hint were used, and whether fix verification caused data loss.
+- Suggested score per scenario: 100 points per tier passed, minus 10 for the hint (the curriculum link is free), with a time bonus for passing under a scenario's target time. Keep the formula in one place so it can change.
 - Collateral damage: scenarios can declare `preserve` checks (for example, the orders table row count must not drop). Failing a preserve check caps the `fixed` tier as failed.
 
 ## Scenario catalog
 
-The bootstrap set is 24 scenarios, six categories with four levels each. MVP is the 12 L1–L2 scenarios, all single-node.
+The bootstrap set is 24 scenarios, six categories with four levels each; built scenarios now outnumber it at L3, and planned ones take the next free number at their level. MVP is the 12 L1–L2 scenarios, all single-node.
 
 ### Linux
 
@@ -300,7 +303,8 @@ The bootstrap set is 24 scenarios, six categories with four levels each. MVP is 
 | --- | --- | --- | --- | --- |
 | `linux/1.1` | L1 | App log level set to debug; the log fills `/data`, which also holds the MySQL data directory. | Free space, service healthy. | Log level restored, logrotate configured, space trend flat. |
 | `linux/2.1` | L2 | `df` shows free space but writes fail. Variant A: deleted log still held open by a process. Variant B: inode exhaustion from millions of session files. Variant chosen by seed. | Writes succeed. | Holder fixed or restarted with rotation that reopens files; for B, session cleanup job in place. |
-| `linux/3.1` | L3 | New fstab entry for a data volume is wrong; the shop unit depends on the mount. Service fails after reboot. | Service up. | fstab and unit ordering correct; survives reboot. |
+| `linux/3.1` | L3 | `/data` was unmounted for maintenance while the shop kept running; its logs went into the empty mountpoint on `/` and are hidden once the volume is mounted again. `df` says full, `du` can't find it. | Space freed from under the mountpoint (bind mount). | Shop and worker require `/data` (`RequiresMountsFor=`); survives reboot. |
+| `linux/3.2` | L3 | New fstab entry for a data volume is wrong; the shop unit depends on the mount. Service fails after reboot. | Service up. | fstab and unit ordering correct; survives reboot. |
 | `linux/4.1` | L4 | Config management lowered the app's cgroup memory limit, a sidecar leaks memory, and `oom_score_adj` points the OOM killer at the app. | App stable for the hold period. | Limit corrected, sidecar leak fixed or contained, OOM priority corrected; survives load replay. |
 
 ### Performance
@@ -309,7 +313,8 @@ The bootstrap set is 24 scenarios, six categories with four levels each. MVP is 
 | --- | --- | --- | --- | --- |
 | `performance/1.1` | L1 | A cron job runs a CPU-bound loop every minute. | Latency back under target. | Cron entry removed or fixed. |
 | `performance/2.1` | L2 | Worker concurrency raised past available memory; the box swaps. | Latency back under target. | Concurrency right-sized; no swap-in under load replay. |
-| `performance/3.1` | L3 | A backup job every 10 minutes saturates disk I/O; p99 spikes while CPU looks normal. | Spikes stop. | Backup throttled (ionice, rate limit) or rescheduled; p99 stable across two backup cycles. |
+| `performance/3.1` | L3 | A cost-control change puts the shop and worker in a systemd slice with a 4–6% CPU quota. The host looks idle; the shop is throttled. | Latency back under target. | Quota removed or raised in the slice unit; survives reboot. |
+| `performance/3.2` | L3 | A backup job every 10 minutes saturates disk I/O; p99 spikes while CPU looks normal. | Spikes stop. | Backup throttled (ionice, rate limit) or rescheduled; p99 stable across two backup cycles. |
 | `performance/4.1` | L4 | DB pool too small for peak load; requests queue and time out, and client retries double the load. Only appears under peak. | Error rate under target at peak. | Pool sized correctly and retry policy uses backoff with a budget; survives peak replay. |
 
 ### Networking
@@ -318,7 +323,9 @@ The bootstrap set is 24 scenarios, six categories with four levels each. MVP is 
 | --- | --- | --- | --- | --- |
 | `networking/1.1` | L1 | `resolv.conf` points to a dead resolver after a simulated DHCP change. Outbound calls by hostname fail. | Resolution works. | Resolver config fixed at its source so it survives reboot. |
 | `networking/2.1` | L2 | An iptables rule drops traffic to the app port from the proxy. SSH works. | Traffic flows. | Rule removed from the persisted firewall config; survives reboot. |
-| `networking/3.1` | L3 | App's outbound client has keepalive disabled; TIME\_WAIT sockets exhaust ephemeral ports under load. Variant: conntrack table full. | Errors stop. | Keepalive or pooling enabled; survives load replay. |
+| `networking/3.1` | L3 | A stateful firewall rule turns on connection tracking, and a tuning change caps the table at about 1000 entries. At peak the kernel drops packets: 10 s hangs and errors that only the edge load balancer sees. | Errors stop. | Limit sized in the sysctl file; firewall rule kept; survives reboot. |
+| `networking/3.2` | L3 | Wrong MAC for the payments host on the service segment: a stale static neighbor with swapped digits, or a decommissioned host announcing the same IP. | Checkout works. | Pin removed or old host retired; ARP learns the right MAC after a reboot. |
+| `networking/3.3` | L3 | App's outbound client has keepalive disabled; TIME\_WAIT sockets exhaust ephemeral ports under load. Variant: conntrack table full. | Errors stop. | Keepalive or pooling enabled; survives load replay. |
 | `networking/4.1` | L4 | A tunnel lowers the MTU and ICMP is filtered, so path MTU discovery fails. Small responses work, large ones hang. | Large responses complete. | MTU corrected or MSS clamped, and ICMP fragmentation-needed allowed. |
 
 ### Databases (MySQL)
@@ -327,7 +334,8 @@ The bootstrap set is 24 scenarios, six categories with four levels each. MVP is 
 | --- | --- | --- | --- | --- |
 | `databases/1.1` | L1 | New app build leaks a connection on an error path until MySQL hits `max_connections` (ERROR 1040). Variant: disk full from binlogs with no expiry. | Connections available, errors stop. | Leak fixed (good build deployed or code corrected); connections stable under load replay. |
 | `databases/2.1` | L2 | A migration dropped an index; one endpoint slows sharply. | Latency back under target. | Index restored; slow query rate at baseline. |
-| `databases/3.1` | L3 | `ALTER TABLE` waits on a metadata lock held by a forgotten open transaction; every later query on the table queues behind it. | Queries on the table complete. | Idle transaction found and the app code path that leaves it open fixed. |
+| `databases/3.1` | L3 | A tuning change moves MySQL's `tmpdir`; AppArmor denies it, so MySQL won't start though permissions look right. | MySQL running. | Directory allowed in the profile's local additions (or change reverted) with the profile still enforced; survives reboot. |
+| `databases/3.2` | L3 | `ALTER TABLE` waits on a metadata lock held by a forgotten open transaction; every later query on the table queues behind it. | Queries on the table complete. | Idle transaction found and the app code path that leaves it open fixed. |
 | `databases/4.1` | L4 | A table has no primary key, so with row-based replication the replica scans per row event and lags during a batch job. The app reads its own writes from the replica. | Users see their own writes. | Primary key added and read-your-writes handled (reads after writes go to the source). |
 
 ### Production services
@@ -336,8 +344,10 @@ The bootstrap set is 24 scenarios, six categories with four levels each. MVP is 
 | --- | --- | --- | --- | --- |
 | `services/1.1` | L1 | Typo in an env var in `shop.env` after a config change; the service crash-loops. | Service running. | Config corrected. |
 | `services/2.1` | L2 | Served cert chain is missing an intermediate, so some clients fail. A second cert expires in 2 days. | All clients connect. | Full chain served and the expiring cert renewed. |
-| `services/3.1` | L3 | A new app build leaks memory slowly. | Memory stable (rollback). | Leak identified with pprof and the fix deployed. |
-| `services/4.1` | L4 | Redis restarts, a cache stampede hits MySQL, MySQL saturates, retries without backoff keep it down. | Error rate under target. | Backoff, request coalescing and concurrency limits in place; survives a forced Redis restart during load replay. |
+| `services/3.1` | L3 | A config-sync timer reinstalls a bad payments URL from a git repository every five minutes, undoing manual fixes. | Checkout works for longer than the sync interval. | Repository corrected, sync still running. |
+| `services/3.2` | L3 | A new app build leaks memory slowly. | Memory stable (rollback). | Leak identified with pprof and the fix deployed. |
+| `services/4.1` | L4 | A vendor release of the thumbnail service fills `/` from a corrupt photo. Redis can't save its snapshot and refuses writes, so checkout fails; the shop's data volume has room. | Checkout works (thumbnails stopped, space freed). | Release rolled back or photo quarantined, disk cleared, Redis saving again. |
+| `services/4.2` | L4 | Redis restarts, a cache stampede hits MySQL, MySQL saturates, retries without backoff keep it down. | Error rate under target. | Backoff, request coalescing and concurrency limits in place; survives a forced Redis restart during load replay. |
 
 ### Distributed systems (multi-node, M5)
 

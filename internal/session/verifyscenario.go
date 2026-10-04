@@ -3,10 +3,17 @@ package session
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/http"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"github.com/opsschool/emulator/internal/checks"
+	"github.com/opsschool/emulator/internal/edge"
 	"github.com/opsschool/emulator/internal/scenario"
+	"github.com/opsschool/emulator/internal/telemetry"
+	"github.com/opsschool/emulator/internal/vm"
 )
 
 // TestReport is the outcome of verifying a scenario end to end.
@@ -62,6 +69,15 @@ func (e *Env) TestScenario(ctx context.Context, s *scenario.Scenario, seed uint6
 	}
 	lctx, stopLoad := context.WithCancel(ctx)
 	defer stopLoad()
+	// No session daemon runs here, so serve the edge metrics it would.
+	ed := edge.New(fmt.Sprintf("http://127.0.0.1:%d", telemetry.LokiPort))
+	stopEdge, err := serveEdge(lctx, e.Machine, ed)
+	if err != nil {
+		return rep, err
+	}
+	defer stopEdge()
+	gen.OnResult = ed.Observe
+	go ed.Run(lctx)
 	go gen.Run(lctx)
 
 	e.Say("Applying break.sh")
@@ -151,4 +167,29 @@ func allPass(ss []TestStep) bool {
 		}
 	}
 	return len(ss) > 0
+}
+
+// serveEdge serves the edge metrics where Prometheus scrapes the session
+// daemon, for runs without one.
+func serveEdge(ctx context.Context, m vm.Driver, ed *edge.Edge) (func(), error) {
+	addrs := []string{ControlAddr}
+	if m.TelemetryNetwork() != "" {
+		gw, err := vm.NetworkGateway(ctx)
+		if err != nil {
+			return nil, err
+		}
+		addrs = append(addrs, fmt.Sprintf("%s:%d", gw, telemetry.CLIMetricsPort))
+	}
+	mux := http.NewServeMux()
+	mux.Handle("GET /edge/metrics", promhttp.HandlerFor(ed.Registry, promhttp.HandlerOpts{}))
+	srv := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+	for _, a := range addrs {
+		ln, err := net.Listen("tcp", a)
+		if err != nil {
+			srv.Close()
+			return nil, fmt.Errorf("listen %s: %w", a, err)
+		}
+		go srv.Serve(ln)
+	}
+	return func() { srv.Close() }, nil
 }

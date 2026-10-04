@@ -21,6 +21,10 @@ import (
 // StateDir is where script checks keep state inside the machine.
 const StateDir = "/var/lib/opsschool/state"
 
+// ScriptDir is where scenario scripts are copied to run. It is in memory
+// (/run is a tmpfs), so the harness keeps working on a full disk.
+const ScriptDir = "/run/opsschool"
+
 // Phases passed to script checks as OPSSCHOOL_PHASE.
 const (
 	PhaseBaseline = "baseline"
@@ -191,7 +195,7 @@ func Query(ctx context.Context, client *http.Client, base, expr string) ([]float
 
 // script copies the check script into the machine and runs it there.
 func (e *Engine) script(ctx context.Context, c scenario.Check, phase string) (bool, string, error) {
-	remote := "/var/lib/opsschool/checks/" + path.Base(c.Run)
+	remote := ScriptDir + "/checks/" + path.Base(c.Run)
 	if err := e.Machine.CopyIn(ctx, e.Scenario.Path(c.Run), remote); err != nil {
 		return false, "", err
 	}

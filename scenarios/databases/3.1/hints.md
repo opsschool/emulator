@@ -1,0 +1,1 @@
+MySQL says it can't write to its new directory, yet the ownership and mode look right. Something besides file permissions decides which paths a process may open. Search the kernel log (`journalctl -k`) for `DENIED` around the time MySQL tried to start.

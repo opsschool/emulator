@@ -1,0 +1,5 @@
+# Service segment: hosts for site services (the payments host) share this
+# bridge with the shop.
+[NetDev]
+Name=br-svc
+Kind=bridge
