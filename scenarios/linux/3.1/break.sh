@@ -19,10 +19,14 @@ sleep 5
 systemctl stop shop.service
 # Hours of that, enough to fill the root disk.
 f=/data/log/shop/app.log
-avail=$(df --output=avail -B1 / | tail -1)
 size=$(df --output=size -B1 / | tail -1)
-grow=$((avail - size / 100))
-((grow > 0)) && fallocate -o "$(stat -c %s "$f")" -l "$grow" "$f"
+keep=$((size * 3 / 200))
+avail() { df --output=avail -B1 / | tail -1; }
+while (($(avail) > keep + (1 << 30))); do
+  fallocate -o "$(stat -c %s "$f")" -l 1G "$f" || break
+done
+left=$(($(avail) - keep))
+((left > 0)) && { fallocate -o "$(stat -c %s "$f")" -l "$left" "$f" || true; }
 
 mount /data
 systemctl start mysql.service shop-worker.service shop.service alloy.service # lint:allow alloy
