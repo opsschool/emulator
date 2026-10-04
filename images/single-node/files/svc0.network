@@ -1,5 +1,8 @@
 [Match]
 Name=svc0
 
+[Link]
+RequiredForOnline=no
+
 [Network]
 Address=10.53.0.10/24

@@ -1,0 +1,12 @@
+[Unit]
+Description=Service segment: the payments host
+After=systemd-networkd.service
+Before=shop-payments.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/svc-net-up
+
+[Install]
+WantedBy=multi-user.target

@@ -36,7 +36,7 @@ Every single-node scenario runs against the same machine:
 | --- | --- |
 | Shop API | `shop.service`, `127.0.0.1:8080`, behind nginx on port 80 |
 | Worker | `shop-worker.service` |
-| Payments stand-in | `shop-payments.service`, `payments.shop.internal:8081` (127.0.0.1) |
+| Payments stand-in | `shop-payments.service`, `payments.shop.internal:8081`. Under Lima it runs in network namespace `pay1` at 10.54.0.20 on bridge `br-svc` (10.54.0.1), a real layer-2 neighbor; in the container, on 127.0.0.1 |
 | HTTPS | nginx on 443 for `api.shop.internal` and `partners.shop.internal`; internal CA in `/etc/ssl/shop-ca`, `shop-cert-issue <host>` |
 | Site DNS | dnsmasq on `svc0` (10.53.0.10), used by systemd-resolved via `/etc/systemd/resolved.conf.d/site-dns.conf` (Lima only) |
 | Firewall | `/etc/iptables/rules.v4`, loaded at boot by `netfilter-persistent` |

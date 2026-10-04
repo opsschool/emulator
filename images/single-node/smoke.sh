@@ -36,6 +36,9 @@ check "persisted firewall" test -s /etc/iptables/rules.v4
 if [[ $(systemd-detect-virt --container || true) == none ]]; then
   check "swap on" bash -c '[[ -n $(swapon --noheadings) ]]'
   check "unit dnsmasq active" systemctl is-active --quiet dnsmasq
+  check "payments host on the service segment" curl -fsS http://10.54.0.20:8081/health
+  # shellcheck disable=SC2016 # expanded by the inner bash
+  check "payments resolves to the service segment" bash -c '[[ $(getent hosts payments.shop.internal) == 10.54.0.20* ]]'
   # Since dnsmasq last started: provisioning starts it once with stock defaults.
   dns_warnings=$(journalctl -q -p warning -t dnsmasq -t resolvconf --since "$(systemctl show -P InactiveExitTimestamp dnsmasq)")
   check "no dns warnings from dnsmasq" test -z "$dns_warnings"

@@ -121,6 +121,22 @@ configure_site_dns() {
   systemctl restart dnsmasq
 }
 
+# The service segment: the payments host is a network namespace (pay1,
+# 10.54.0.20) cabled to the br-svc bridge (10.54.0.1), so the shop reaches
+# it as a real neighbor, over ARP. The container driver keeps payments on
+# loopback.
+configure_service_segment() {
+  [[ $mode == container ]] && return
+  log "service segment"
+  install -m 0644 "$files/br-svc.netdev" "$files/br-svc.network" /etc/systemd/network/
+  networkctl reload
+  install -m 0755 "$files/svc-net-up" /usr/local/sbin/svc-net-up
+  install -m 0644 "$files/svc-net.service" /etc/systemd/system/
+  install -D -m 0644 "$files/shop-payments-netns.conf" /etc/systemd/system/shop-payments.service.d/netns.conf
+  systemctl daemon-reload
+  systemctl enable --now svc-net.service
+}
+
 # Base firewall: the database and cache are reachable only locally. Loaded
 # at boot by netfilter-persistent. networking/2.1 breaks this.
 configure_firewall() {
@@ -303,6 +319,7 @@ main() {
   configure_mysql
   setup_swap
   configure_site_dns
+  configure_service_segment
   configure_firewall
   install_shop
   configure_tls
