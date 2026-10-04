@@ -32,4 +32,4 @@ spare.
 
 ## Curriculum
 
-- [Networking 201](https://www.opsschool.org/networking_201.html)
+- [Security 201: the connection tracking table](https://www.opsschool.org/security_201.html#the-connection-tracking-table)
