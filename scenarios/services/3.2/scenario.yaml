@@ -1,0 +1,23 @@
+category: services
+image: single-node
+curriculum: https://www.opsschool.org/unix_101.html
+alerts:
+  - "ShopRestarts: shop.service restarted 4 times in 15m"
+  - "ShopErrorRate: 5xx bursts above 5% at peak"
+summary: >
+  The shop keeps restarting itself, but only when it's busy. Between
+  restarts it's fine. The security team rolled out service hardening last
+  week, and the developers say nothing in the shop changed.
+randomize:
+  tasks:
+    choices: ["12", "14", "16"]
+fix_verification:
+  restart: [shop.service]
+  reboot: true
+  load_replay: 180s
+load:
+  profile: peak
+# no_restarts.sh already requires four minutes up.
+mitigate_hold: 60s
+time_limit: 45m
+target_time: 25m

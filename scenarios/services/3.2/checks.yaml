@@ -1,0 +1,17 @@
+mitigated:
+  - name: the shop has not restarted for 4 minutes
+    type: script
+    run: checks/no_restarts.sh
+  - name: error rate under 1%
+    type: promql
+    expr: >
+      (sum(rate(http_requests_total{code=~"5.."}[1m])) or vector(0))
+      / sum(rate(http_requests_total[1m])) < 0.01
+fixed:
+  - name: the shop's task limit leaves room to grow
+    type: script
+    run: checks/tasks_ok.sh
+preserve:
+  - name: no orders lost
+    type: script
+    run: checks/orders_preserved.sh
