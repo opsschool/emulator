@@ -9,7 +9,8 @@ Newest first.
 the root disk. `mkfs.ext4` discarded the device, which punched holes in the
 image file: only about 1 GB of its 6 GB was allocated. Once `/` was full,
 writes to `/data` that needed new blocks failed, and MySQL couldn't create
-`ibtmp1` on restart. The image is now formatted with `-E nodiscard`,
+`ibtmp1` on restart. The image is now formatted with `-E nodiscard` and without lazy
+initialization (its zeroing punches holes too),
 allocated in full with `fallocate`, and `fstrim.timer` is masked so it stays
 that way. A smoke check guards it. `/data` now behaves like its own disk.
 

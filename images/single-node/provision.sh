@@ -55,9 +55,10 @@ setup_data_volume() {
     else
       fallocate -l 6G /var/lib/data.img
     fi
-    # nodiscard: discarding would punch holes in the image file, and then
-    # writes to /data need space on / (a full / would break /data too).
-    mkfs.ext4 -q -F -E nodiscard -L shopdata /var/lib/data.img
+    # Discards, and the zeroing that lazy init does after mounting, punch
+    # holes in the image file; then writes to /data need space on /, and a
+    # full / breaks /data too. Do all zeroing now, without discarding.
+    mkfs.ext4 -q -F -E nodiscard,lazy_itable_init=0,lazy_journal_init=0 -L shopdata /var/lib/data.img
     mkdir -p /data
     echo '/var/lib/data.img /data ext4 loop,defaults 0 2' >>/etc/fstab
   fi
