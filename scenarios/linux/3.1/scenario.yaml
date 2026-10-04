@@ -1,0 +1,17 @@
+category: linux
+image: single-node
+curriculum: https://www.opsschool.org/filesystems_101.html
+alerts:
+  - "HostFilesystemFull: / has less than 2% space left"
+summary: >
+  The root disk filled up overnight. Wally tried to install updates and apt
+  says there's no space left on device. The data volume was taken offline
+  for an integrity check last night and brought back, and nothing else has
+  changed. The night shift looked for big files and found nothing.
+fix_verification:
+  restart: [shop.service, shop-worker.service]
+  reboot: true
+  load_replay: 60s
+mitigate_hold: 60s
+time_limit: 45m
+target_time: 25m

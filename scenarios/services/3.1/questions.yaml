@@ -1,0 +1,22 @@
+- id: reverter
+  prompt: What undid the first fix?
+  type: choice
+  choices:
+    - The shop rewrote its own configuration on restart
+    - A timer that installs configuration from a git repository
+    - A cron job that restores backups
+    - Someone else on the team
+  answer: 1
+- id: url
+  prompt: What payments address did the bad change set (the full URL)?
+  type: text
+  answer_from_var: bad_url
+- id: right-fix
+  prompt: Why is disabling the sync not a good fix?
+  type: choice
+  choices:
+    - It is a fine fix
+    - The bad value is still in the source of truth, and the next person to re-enable the sync, or rebuild the server, brings the outage back
+    - The timer can't be disabled
+    - It restarts the shop
+  answer: 1

@@ -1,0 +1,18 @@
+- id: why-du
+  prompt: Why couldn't du find the space?
+  type: choice
+  choices:
+    - The files had been deleted but were still open
+    - The files were underneath the /data mountpoint, hidden by the mounted volume
+    - du doesn't count log files
+    - The space was reserved for root
+  answer: 1
+- id: prevent
+  prompt: Which unit setting stops a service from starting before a filesystem is mounted?
+  type: choice
+  choices:
+    - After=network-online.target
+    - RequiresMountsFor=
+    - Restart=always
+    - ReadWritePaths=
+  answer: 1

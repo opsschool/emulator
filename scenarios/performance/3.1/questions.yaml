@@ -1,0 +1,22 @@
+- id: where
+  prompt: Where was the CPU limit set?
+  type: choice
+  choices:
+    - On shop.service
+    - On the slice that shop.service was moved into
+    - In the kernel's scheduler settings
+    - In the shop's own configuration
+  answer: 1
+- id: slice
+  prompt: What was the slice called (without .slice)?
+  type: text
+  answer_from_var: slice
+- id: evidence
+  prompt: Which file shows that a group of processes is being throttled?
+  type: choice
+  choices:
+    - /proc/loadavg
+    - cpu.stat in the group's cgroup directory
+    - /proc/stat
+    - /var/log/syslog
+  answer: 1
