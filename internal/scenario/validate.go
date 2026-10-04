@@ -278,7 +278,7 @@ var breakRules = []struct {
 	{"ssh", "touches SSH, which the harness uses", regexp.MustCompile(`\bsshd?\b|\bdport 22\b|:22\b`)},
 	{"exporters", "touches an exporter", regexp.MustCompile(`node_exporter|node-exporter|process-exporter|mysqld_exporter|mysqld-exporter|redis_exporter|redis-exporter|\b91(00|04|21)\b|\b9256\b`)},
 	{"alloy", "touches Grafana Alloy (log shipping)", regexp.MustCompile(`\balloy\b`)},
-	{"harness", "touches harness files", regexp.MustCompile(`/opt/opsschool|/etc/opsschool|/var/lib/opsschool`)},
+	{"harness", "touches harness files", regexp.MustCompile(`/opt/opsschool|/etc/opsschool|/var/lib/opsschool|/run/opsschool`)},
 }
 
 func (v *validator) breakScript() {

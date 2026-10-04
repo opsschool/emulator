@@ -74,8 +74,10 @@ func (l *Lima) Run(ctx context.Context, script string, env []string) (Result, er
 }
 
 func (l *Lima) CopyIn(ctx context.Context, local, remote string) error {
-	// limactl copy runs as the Lima user; stage in /tmp, then move as root.
-	tmp := "/tmp/opsschool-copy-" + fmt.Sprint(time.Now().UnixNano())
+	// limactl copy runs as the Lima user; stage in /dev/shm, then move as
+	// root. Both ends are in memory, so copies work when a scenario has
+	// filled the disk.
+	tmp := "/dev/shm/opsschool-copy-" + fmt.Sprint(time.Now().UnixNano())
 	args := []string{"copy", local, SessionName + ":" + tmp}
 	// Only for directories: the rsync backend treats a -r source as one.
 	if fi, err := os.Stat(local); err != nil {

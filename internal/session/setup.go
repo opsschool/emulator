@@ -137,7 +137,7 @@ const Baseline = 2 * time.Minute
 // RunScript copies one of the scenario's scripts into the machine, runs it
 // as root with the session environment, and removes it.
 func RunScript(ctx context.Context, m vm.Driver, s *scenario.Scenario, name string, env []string) error {
-	remote := "/var/lib/opsschool/run/" + filepath.Base(name)
+	remote := checks.ScriptDir + "/run/" + filepath.Base(name)
 	if err := m.CopyIn(ctx, s.Path(name), remote); err != nil {
 		return err
 	}

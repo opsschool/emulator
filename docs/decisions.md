@@ -3,6 +3,14 @@
 Changes to [design.md](design.md) and judgment calls made while building.
 Newest first.
 
+## 2026-10-04: The harness works on a full disk
+
+Scenario scripts used to be staged in `/tmp` and copied to
+`/var/lib/opsschool` on the root disk, so once services/4.1 filled `/`
+every check and fix script failed to copy. Copies now stage in `/dev/shm`
+and scripts run from `/run/opsschool`, both in memory. Check state stays in
+`/var/lib/opsschool/state`; it is written once, before the break.
+
 ## 2026-10-04: Image additions for the first L3–L4 scenarios
 
 - **Payments on its own layer-2 segment (Lima only).** `shop-payments` runs
