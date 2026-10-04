@@ -34,6 +34,7 @@ check "https api, full chain" curl -fsS --resolve api.shop.internal:443:127.0.0.
 check "https partners, full chain" curl -fsS --resolve partners.shop.internal:443:127.0.0.1 https://partners.shop.internal/health
 check "persisted firewall" test -s /etc/iptables/rules.v4
 if [[ $(systemd-detect-virt --container || true) == none ]]; then
+  # shellcheck disable=SC2016 # expands in the child shell
   check "swap on" bash -c '[[ -n $(swapon --noheadings) ]]'
   check "unit dnsmasq active" systemctl is-active --quiet dnsmasq
   check "payments host on the service segment" curl -fsS http://10.54.0.20:8081/health
@@ -42,7 +43,7 @@ if [[ $(systemd-detect-virt --container || true) == none ]]; then
   # Since dnsmasq last started: provisioning starts it once with stock defaults.
   dns_warnings=$(journalctl -q -p warning -t dnsmasq -t resolvconf --since "$(systemctl show -P InactiveExitTimestamp dnsmasq)")
   check "no dns warnings from dnsmasq" test -z "$dns_warnings"
-  [[ -z $dns_warnings ]] || sed 's/^/       /' <<<"$dns_warnings"
+  [[ -z $dns_warnings ]] || while read -r line; do echo "       $line"; done <<<"$dns_warnings"
 fi
 # shellcheck disable=SC2016 # expanded by the inner bash
 check "orders seeded" bash -c '(( $(mysql -N -B shop -e "SELECT COUNT(*) FROM orders") > 1000 ))'
