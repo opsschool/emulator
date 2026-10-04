@@ -3,6 +3,36 @@
 Changes to [design.md](design.md) and judgment calls made while building.
 Newest first.
 
+## 2026-10-04: Image additions for the first L3–L4 scenarios
+
+- **Payments on its own layer-2 segment (Lima only).** `shop-payments` runs
+  in network namespace `pay1` (10.54.0.20, MAC 52:54:00:36:00:14), cabled
+  to bridge `br-svc` (10.54.0.1, managed by systemd-networkd), and DNS
+  points `payments.shop.internal` there. The shop now reaches payments as a
+  real neighbor over ARP, which networking/3.2 needs. The container driver
+  keeps payments on loopback. networking/1.1's `/etc/hosts` mitigation pins
+  the new address.
+- **A thumbnail sidecar.** `shop-thumbs` (a small Python service) makes
+  thumbnails from photos in `/data/uploads/queue`. 1.4.2 runs; 1.5.0, with
+  a scratch-file bug, sits in `/usr/local/lib/shop-builds` for services/4.1.
+- **Tools:** `arping` and `conntrack`.
+- `svc0` and `br-svc` are not required for network-online. Waiting for them
+  logged an error-level timeout at every boot that looked like a network
+  fault.
+
+## 2026-10-04: L3–L4 ideas tried and shelved
+
+- **Order ID overflow:** `orders.id` is already BIGINT, and the only
+  mitigation is the fix, so the tiers would be the same.
+- **Thread limit (`TasksMax`):** at this load neither the shop nor MySQL
+  needs more than a thread or two beyond its idle count, because requests
+  take about 2 ms. A limit low enough to bite at peak also breaks unrelated
+  things at idle. Worth revisiting if the workload gains real concurrency.
+- **Redis refusing writes after core dumps fill the disk:** systemd-coredump
+  stops with less than one core's worth of space left, and Redis's snapshot
+  fits in that. services/4.1 fills the disk with a scratch file instead,
+  which writes until ENOSPC, and the incident became MySQL going down.
+
 ## 2026-10-04: Checkout takes a lock in Redis
 
 Before this, the shop used Redis only as a cache, and every Redis error fell
