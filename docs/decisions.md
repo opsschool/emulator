@@ -3,6 +3,28 @@
 Changes to [design.md](design.md) and judgment calls made while building.
 Newest first.
 
+## 2026-10-05: Scenarios that need a VM
+
+A sweep of every scenario under `--driver container` showed six that can't
+work on the container image, and so not in hosted mode either:
+
+| Scenario | Why |
+| --- | --- |
+| databases/3.1 | Loads an AppArmor profile. The image has no `apparmor_parser`, and profiles belong to the host. |
+| linux/3.1 | Fills the root disk. In a container that's the host's disk, or on Kubernetes the node's. |
+| networking/1.1 | Breaks the site resolver. Docker and the kubelet own `resolv.conf`, so the image has none. |
+| networking/3.1 | Sets `nf_conntrack_max`, which is read-only outside the host's network namespace. |
+| networking/3.2 | Needs the service segment (a bridge and a payments namespace), which the image leaves out. |
+| performance/2.1 | Runs the machine out of memory. In a container that's the host's memory and swap. |
+
+Rather than fake these in a container, `scenario.yaml` takes a `needs_vm`
+reason. `opsschool test` skips the scenario under the container driver
+(so the Scenarios CI loop still covers everything else), `opsschool start`
+refuses it, and `opsschool serve` leaves it off the portal and logs why.
+The start error doesn't repeat the reason, because it names the cause.
+Hosted mode offers the other twelve; a Kata runtime class would give each
+machine its own kernel and could lift some of these later.
+
 ## 2026-10-05: Hosted mode on Kubernetes
 
 Most organisations will run Ops School as a web page with a shared

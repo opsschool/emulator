@@ -85,6 +85,10 @@ func runStart(e *Env, args []string) error {
 	if err != nil {
 		return err
 	}
+	if m.Name() != "lima" && s.Spec.NeedsVM != "" {
+		// Not the reason: it would give the scenario away.
+		return fmt.Errorf("%s needs a virtual machine; start it with --driver lima", s.Spec.ID)
+	}
 	if *seed == 0 {
 		*seed = session.NewSeed()
 	}

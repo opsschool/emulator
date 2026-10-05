@@ -18,3 +18,5 @@ fix_verification:
 mitigate_hold: 180s
 time_limit: 45m
 target_time: 25m
+# Hosted mode and --driver container skip this scenario.
+needs_vm: it needs the service network segment, which the container image doesn't have

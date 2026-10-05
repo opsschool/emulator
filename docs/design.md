@@ -181,6 +181,7 @@ Rules:
 - `randomize` values are chosen once per session from a seed and passed to every script as environment variables named `OPSSCHOOL_VAR_<NAME>` (uppercased).
 - The session seed, username and scenario ID are passed as `OPSSCHOOL_SEED`, `OPSSCHOOL_USER` and `OPSSCHOOL_SCENARIO`.
 - A scenario's ID is `<category>/<level>.<n>`, from its directory, for example `linux/1.1` or `databases/2.3`. The level (1 to 4) comes from the directory, not from scenario.yaml; `n` numbers the scenarios at that level from 1, and a new scenario takes the next free number. The ID says nothing else about the scenario, and scenarios have no title.
+- `needs_vm`, optional, says why a scenario can't run on the container image, for example because it changes a kernel setting that a container can only read. `opsschool test --driver container` skips such a scenario, `opsschool start` refuses it without saying why, and hosted mode doesn't offer it.
 - `alerts` and `summary` are the only text shown to the learner at start. Each alert is one line, printed as `[FIRING] <line>`, like a page from the alerting system; leave it out when nothing would fire and the incident arrives as a report. The `summary` is what people are reporting. Both describe symptoms, never the cause.
 
 ### checks.yaml

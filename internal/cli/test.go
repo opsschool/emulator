@@ -47,6 +47,11 @@ func runTest(e *Env, args []string) error {
 	if err != nil {
 		return err
 	}
+	// Skipped rather than failed, so CI can loop over every scenario.
+	if m.Name() != "lima" && s.Spec.NeedsVM != "" {
+		fmt.Fprintf(e.Stdout, "\n%s: skipped; it only runs with --driver lima: %s\n", s.Spec.ID, s.Spec.NeedsVM)
+		return nil
+	}
 	ctx, cancel := signalContext()
 	defer cancel()
 	env := &session.Env{Home: home, Machine: m, Say: func(s string) { fmt.Fprintln(e.Stdout, "==> "+s) }}

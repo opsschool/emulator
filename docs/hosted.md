@@ -155,7 +155,14 @@ while it restarts.
   that restarts loses its files, and the checks need them to survive.
 - The machine is the container image, so the things `--driver container`
   can't do apply here too; see "Container driver for development and CI" in
-  [decisions.md](decisions.md).
+  [decisions.md](decisions.md). Scenarios that need a real machine, such
+  as those that change kernel settings or fill the disk, say so with
+  `needs_vm` in their `scenario.yaml`. The portal leaves them out and logs
+  each one it skips when it starts.
+- If your nodes run MySQL, or anything else with an AppArmor profile for
+  `/usr/sbin/mysqld`, the profile applies inside the machine pods too and
+  stops the shop's database. Unload it on those nodes, or keep the machine
+  pods on nodes without it.
 
 ## When something goes wrong
 

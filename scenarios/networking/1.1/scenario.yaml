@@ -17,3 +17,5 @@ fix_verification:
 mitigate_hold: 60s
 time_limit: 45m
 target_time: 15m
+# Hosted mode and --driver container skip this scenario.
+needs_vm: it breaks the site resolver, which the container image doesn't have

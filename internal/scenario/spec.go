@@ -48,6 +48,10 @@ type Spec struct {
 	TimeLimit       Duration        `yaml:"time_limit"`
 	TargetTime      Duration        `yaml:"target_time"`
 	Load            LoadSpec        `yaml:"load"`
+	// NeedsVM, when set, says why the scenario can't run on the container
+	// image (and so not in hosted mode), for example "it fills the root
+	// disk, which in a container is the host's disk".
+	NeedsVM string `yaml:"needs_vm"`
 }
 
 // Var is one randomized variable. Exactly one of Choices or Range is set.

@@ -75,6 +75,10 @@ func runServe(e *Env, args []string) error {
 			fmt.Fprintf(e.Stderr, "skipping %s: it doesn't validate\n", s.Spec.ID)
 			continue
 		}
+		if s.Spec.NeedsVM != "" {
+			fmt.Fprintf(e.Stderr, "skipping %s: it only runs on a VM: %s\n", s.Spec.ID, s.Spec.NeedsVM)
+			continue
+		}
 		valid = append(valid, s)
 	}
 	if len(valid) == 0 {
