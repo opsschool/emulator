@@ -1,0 +1,21 @@
+mitigated:
+  - name: order error rate under 1%
+    type: promql
+    expr: >
+      (sum(rate(http_requests_total{route="POST /orders",code=~"5.."}[1m])) or vector(0))
+      / sum(rate(http_requests_total{route="POST /orders"}[1m])) < 0.01
+  - name: order history p99 under 500ms
+    type: promql
+    expr: >
+      histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{route="GET /customers/{id}/orders"}[1m]))) < 0.5
+fixed:
+  - name: gift note migration applied
+    type: script
+    run: checks/migration_ok.sh
+  - name: no long idle transactions from the shop
+    type: script
+    run: checks/no_idle_tx.sh
+preserve:
+  - name: no orders lost
+    type: script
+    run: checks/orders_preserved.sh
