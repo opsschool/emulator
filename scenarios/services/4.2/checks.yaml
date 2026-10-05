@@ -1,0 +1,24 @@
+mitigated:
+  - name: checkout errors under 1%
+    type: promql
+    expr: >
+      (sum(rate(http_requests_total{route="POST /orders",code=~"5.."}[1m])) or vector(0))
+      / sum(rate(http_requests_total{route="POST /orders"}[1m])) < 0.01
+fixed:
+  - name: checkout errors under 1% at peak traffic
+    type: promql
+    expr: >
+      (sum(rate(http_requests_total{route="POST /orders",code=~"5.."}[1m])) or vector(0))
+      / sum(rate(http_requests_total{route="POST /orders"}[1m])) < 0.01
+  - name: about one payments call per order
+    type: promql
+    expr: >
+      sum(rate(shop_payment_requests_total[1m]))
+      / sum(rate(http_requests_total{route="POST /orders"}[1m])) < 1.5
+  - name: the payments gateway keeps the card network's limit
+    type: script
+    run: checks/gateway_limit.sh
+preserve:
+  - name: no orders lost
+    type: script
+    run: checks/orders_preserved.sh

@@ -57,6 +57,12 @@ func Open(dsn string, poolSize, maxIdle int) (*sql.DB, error) {
 	}
 	cfg.ParseTime = true
 	cfg.Loc = time.UTC
+	// The shop writes times in UTC, so NOW() and CURDATE() must be UTC
+	// too, whatever the server's time zone.
+	if cfg.Params == nil {
+		cfg.Params = map[string]string{}
+	}
+	cfg.Params["time_zone"] = "'+00:00'"
 	cfg.MultiStatements = true
 	if cfg.Timeout == 0 {
 		cfg.Timeout = 3 * time.Second

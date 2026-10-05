@@ -1,0 +1,1 @@
+Ask MySQL what every connection is doing: `mysql -e "SHOW PROCESSLIST"`. Most are waiting for a lock on `orders`. The ALTER is waiting too, so something else holds that lock: look for connections that are idle but inside a transaction (`information_schema.innodb_trx`), and find which service opened them.

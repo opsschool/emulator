@@ -1,0 +1,25 @@
+category: services
+image: single-node
+curriculum: https://www.opsschool.org/architecture_201.html#timeouts-and-retries
+alerts:
+  - "ShopOrderErrors: more than 5% of POST /orders requests are failing (5xx)"
+summary: >
+  Every checkout has failed since the last traffic peak, and it hasn't
+  recovered now that traffic is back to normal. Browsing the catalog works.
+  Two small changes went out this morning, one from the payments team and
+  one to the shop's settings, and everything looked fine for hours after
+  them.
+randomize:
+  retry_max:
+    choices: ["6", "8", "10"]
+fix_verification:
+  restart: [shop-payments.service, shop.service]
+  reboot: false
+  load_replay: 150s
+# Long enough to span a traffic peak, which comes every three minutes.
+mitigate_hold: 200s
+time_limit: 60m
+target_time: 35m
+# Traffic peaks every three minutes start the overload.
+load:
+  profile: peak

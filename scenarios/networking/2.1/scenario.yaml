@@ -1,6 +1,6 @@
 category: networking
 image: single-node
-curriculum: https://www.opsschool.org/networking_201.html
+curriculum: https://www.opsschool.org/security_201.html#iptables-adding-and-deleting-rules
 alerts:
   - "ShopHealthCheckFailing: /health through the load balancer has failed for 2m"
   - "ShopErrorRate: more than 5% of requests are failing (5xx)"

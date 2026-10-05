@@ -74,7 +74,9 @@ func main() {
 	case "maintenance":
 		err = maintenance(ctx, cfg, log)
 	case "payments":
-		err = listen(ctx, log, "payments", paymentsAddr(args), payments.Handler())
+		addr, gw := paymentsFlags(args)
+		gw.Log = log
+		err = listen(ctx, log, "payments", addr, gw.Handler(ctx))
 	case "migrate":
 		err = withStore(cfg, func(s *store.Store) error { return s.Migrate(ctx) })
 	case "seed":
@@ -224,11 +226,15 @@ func seed(ctx context.Context, cfg config.Config, log *slog.Logger, args []strin
 	})
 }
 
-func paymentsAddr(args []string) string {
+func paymentsFlags(args []string) (string, payments.Gateway) {
+	var gw payments.Gateway
 	fs := flag.NewFlagSet("payments", flag.ExitOnError)
 	addr := fs.String("listen", "127.0.0.1:8081", "listen address")
+	fs.IntVar(&gw.Concurrency, "workers", 0, "authorizations at once (0: no limit)")
+	fs.DurationVar(&gw.MinLatency, "min-latency", 0, "shortest authorization (default 2ms)")
+	fs.DurationVar(&gw.MaxLatency, "max-latency", 0, "longest authorization (default 8ms)")
 	fs.Parse(args)
-	return *addr
+	return *addr, gw
 }
 
 func listen(ctx context.Context, log *slog.Logger, name, addr string, h http.Handler) error {

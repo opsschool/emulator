@@ -35,4 +35,5 @@ and a service that shares a quota with a batch worker competes with it.
 
 ## Curriculum
 
+- [init: limiting CPU](https://www.opsschool.org/inits.html#limiting-cpu)
 - [Capacity planning](https://www.opsschool.org/capacity_planning.html)

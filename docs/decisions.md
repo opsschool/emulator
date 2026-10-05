@@ -3,6 +3,26 @@
 Changes to [design.md](design.md) and judgment calls made while building.
 Newest first.
 
+## 2026-10-05: linux/1.1 checks free space now, not the trend
+
+The fixed check `predict_linear(avail[10m], 3600) > 0` failed for about ten
+minutes after a correct fix. The break fills /data in seconds, so the
+10-minute window held a cliff to zero and the fitted line pointed down.
+It also didn't catch what it was for: by estimate, debug logging at normal traffic adds
+tens of MB an hour to a 6 GB volume, so the forecast stayed positive with
+debug still on (the log level check covers that). The check is now "at
+least 20% of /data is free"; a healthy machine has about 80% free.
+
+## 2026-10-05: The shop's MySQL sessions use UTC
+
+The shop writes times in UTC but compared them with `NOW()`, which follows
+the server's time zone. Lima VMs take the host's zone, so on a host east
+of UTC every order in flight looked older than five minutes: the worker
+warned about stuck orders all the time, and in databases/3.2 the 2.4.0
+worker always found "stuck" orders, committed, and never held the lock,
+so the scenario didn't break. Containers run in UTC, which hid it. The
+shop now sets `time_zone='+00:00'` on its connections.
+
 ## 2026-10-05: Hosted sessions get a real VM, with KubeVirt
 
 The project owner's intent for hosted mode is a shared alternative to the
@@ -81,6 +101,35 @@ tabs:
   hand) has none on purpose: the change you need isn't always recorded.
 - Neither file goes into the machine, so the image fingerprint skips both.
   They are embedded in the opsschool binary.
+
+## 2026-10-05: Advanced scenarios: a payments gateway with a worker limit
+
+Two new scenarios for review: databases/3.2 (a metadata lock pileup behind
+a long transaction) and services/4.2 (a retry storm that doesn't recover
+after a traffic peak). Both run under `--driver container`, so hosted mode
+offers them.
+
+services/4.2 needs the payments service to behave like a real card
+gateway: a fixed number of workers, a realistic per-call latency, and no
+cancellation, so it keeps working on calls the shop has given up on.
+`shop payments` takes `--workers`, `--min-latency` and `--max-latency`.
+The defaults (no limit, 2-8ms) keep every other scenario as it was.
+Every 10 seconds it logs a warning with the number of calls waiting for a
+worker, which is the clue the learner needs.
+
+The storm only takes hold above the gateway's capacity, so the scenario
+uses the `peak` load profile, and the break turns off the shop's retry
+backoff. With exponential backoff the shop's five-second order deadline
+already caps attempts at about five, and the system recovered. Raising
+the gateway's worker limit is the mitigation: with spare workers nothing
+times out, so there are no retries. The fixed checks therefore require
+the original limit as well as about one payments call per order, so only
+a change to the shop's timeout and retries counts as a fix.
+
+databases/3.2's pileup filled `max_connections`, so mitigate.sh (and a
+learner) got "Too many connections". Its break caps the shop's account at
+120 connections first.
+
 
 ## 2026-10-05: Scenarios that need a VM
 

@@ -1,0 +1,21 @@
+- id: stuck
+  prompt: Why didn't checkout recover when the traffic peak ended?
+  type: choice
+  choices:
+    - Retries kept the gateway busier than it could handle, even at normal traffic
+    - The gateway ran out of memory and kept restarting
+    - The checkout lock in Redis was never released
+    - The database connection pool was exhausted
+  answer: 0
+- id: retries
+  prompt: What was SHOP_RETRY_MAX set to this morning?
+  type: text
+  answer_from_var: retry_max
+- id: alone
+  prompt: Which of this morning's changes would have caused the outage on its own?
+  type: choice
+  choices:
+    - Neither; it took both
+    - The gateway's concurrency limit
+    - The shop's shorter timeout and extra retries
+  answer: 0

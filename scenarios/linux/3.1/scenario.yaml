@@ -1,6 +1,6 @@
 category: linux
 image: single-node
-curriculum: https://www.opsschool.org/filesystems_101.html
+curriculum: https://www.opsschool.org/filesystems_101.html#when-a-filesystem-is-full
 alerts:
   - "HostFilesystemFull: / has less than 2% space left"
 summary: >

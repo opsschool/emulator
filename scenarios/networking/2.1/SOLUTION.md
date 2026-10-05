@@ -34,5 +34,6 @@ what happened.
 
 ## Curriculum
 
+- [Security 201: adding and deleting iptables rules](https://www.opsschool.org/security_201.html#iptables-adding-and-deleting-rules)
 - [Networking 201](https://www.opsschool.org/networking_201.html)
 - [Security 101](https://www.opsschool.org/security_101.html)

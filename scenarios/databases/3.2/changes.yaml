@@ -1,0 +1,50 @@
+- id: shop#1251
+  title: Release 2.4.0
+  author: deploy-bot
+  team: Shop developers
+  before: 40m
+  status: Deployed to production
+  description: |
+    Release 2.4.0:
+    - Worker: the once-a-minute check for orders stuck in pending makes
+      one fewer database round trip when nothing is stuck.
+    - Catalog: faster product pages.
+  diff: |
+    --- a/internal/store/store.go
+    +++ b/internal/store/store.go
+    @@ -278,9 +278,13 @@ func (s *Store) Reconcile(ctx context.Context) (int64, error) {
+     	var n int64
+     	err = tx.QueryRowContext(ctx,
+     		`SELECT COUNT(*) FROM orders WHERE status = 'pending' AND created_at < NOW(3) - INTERVAL 5 MINUTE`).Scan(&n)
+     	if err != nil {
+     		tx.Rollback()
+     		return 0, err
+     	}
+    +	// Nothing stuck, the common case: skip the commit round trip.
+    +	if n == 0 {
+    +		return 0, nil
+    +	}
+     	return n, tx.Commit()
+     }
+    --- a/VERSION
+    +++ b/VERSION
+    @@ -1 +1 @@
+    -2.3.0
+    +2.4.0
+- id: shop#1254
+  title: "Migration: gift notes on orders"
+  author: alex
+  team: Shop developers
+  before: 5m
+  status: Migration applying
+  description: |
+    Adds a gift_note column for the holiday range. Adding a column at the
+    end of the table is instant in MySQL 8, so this is safe to run with
+    traffic on.
+  diff: |
+    --- /dev/null
+    +++ b/migrations/${migration}_orders_add_gift_note.sql
+    @@ -0,0 +1,3 @@
+    +-- Gift notes for the holiday range. ADD COLUMN at the end is instant in
+    +-- MySQL 8: it only changes the table's metadata.
+    +ALTER TABLE orders ADD COLUMN gift_note VARCHAR(255) NULL;

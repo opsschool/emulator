@@ -1,6 +1,6 @@
 category: performance
 image: single-node
-curriculum: https://www.opsschool.org/capacity_planning.html
+curriculum: https://www.opsschool.org/inits.html#limiting-cpu
 alerts:
   - "ShopLatency: p99 latency above 80ms for 10m"
 summary: >

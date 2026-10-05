@@ -1,6 +1,6 @@
 category: performance
 image: single-node
-curriculum: https://www.opsschool.org/capacity_planning.html
+curriculum: https://www.opsschool.org/stats_diagnosing.html#vmstat
 alerts:
   - "ShopLatency: p99 latency above 250ms for 5m"
 summary: >

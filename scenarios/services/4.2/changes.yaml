@@ -1,0 +1,48 @@
+- id: PAY-298
+  title: "payments gateway: match the card network's per-merchant limit"
+  author: Priya Patel
+  team: Payments team
+  before: 4h
+  status: Deployed to production
+  description: |
+    The card network allows two authorizations in flight per merchant and
+    rejects the rest. Limit the gateway to two at a time so we find out
+    here, not from them. Latency now matches production too (100 to
+    180ms), so tests see real timings. That's about 14 authorizations a
+    second; the shop peaks at about 10 orders a second.
+  diff: |
+    --- /dev/null
+    +++ b/etc/systemd/system/shop-payments.service.d/per-merchant-limit.conf
+    @@ -0,0 +1,5 @@
+    +# PAY-298: the card network allows two authorizations in flight per
+    +# merchant. Match it here so we find out before they reject us.
+    +[Service]
+    +ExecStart=
+    +ExecStart=/opt/shop/current/shop payments --listen 0.0.0.0:8081 --workers 2 --min-latency 100ms --max-latency 180ms
+- id: PAY-311
+  title: "payment client: fail fast and retry"
+  author: sam
+  team: Shop developers
+  before: 3h
+  status: Deployed to production
+  description: |
+    Checkout hangs for up to 2s when the gateway is slow. Give up on a
+    call sooner and try again straight away instead. Every order still
+    has its 5s deadline, so this can't make checkout slower.
+  diff: |
+    --- a/deploy/production/shop.env
+    +++ b/deploy/production/shop.env
+    @@ -15,7 +15,9 @@
+     SHOP_WORKER_CONCURRENCY=4
+     SHOP_WORKER_BUFFER_MB=256
+     SHOP_PAYMENTS_URL=http://payments.shop.internal:8081
+    -SHOP_CLIENT_TIMEOUT=2s
+    +# PAY-311: fail fast and retry rather than leave checkout hanging when
+    +# the gateway is slow.
+    +SHOP_CLIENT_TIMEOUT=500ms
+     SHOP_CLIENT_KEEPALIVE=true
+    -SHOP_RETRY_MAX=2
+    -SHOP_RETRY_BACKOFF=100ms
+    +SHOP_RETRY_MAX=${retry_max}
+    +SHOP_RETRY_BACKOFF=0s
+     SHOP_SESSION_DIR=/data/sessions

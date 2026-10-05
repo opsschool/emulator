@@ -39,5 +39,5 @@ next push doesn't put it back.
 
 ## Curriculum
 
-- [DNS 101](https://www.opsschool.org/dns_101.html)
+- [DNS 101: local resolvers and systemd-resolved](https://www.opsschool.org/dns_101.html#local-resolvers-and-systemd-resolved)
 - [DNS 201](https://www.opsschool.org/dns_201.html)

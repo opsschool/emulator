@@ -1,0 +1,22 @@
+- id: lock
+  prompt: What kind of lock were the queries on orders waiting for?
+  type: choice
+  choices:
+    - A metadata lock
+    - A row lock
+    - A gap lock
+    - A table lock taken with LOCK TABLES
+  answer: 0
+- id: holder
+  prompt: Which service held the transactions that blocked the migration?
+  type: choice
+  choices:
+    - shop-worker
+    - shop
+    - mysqld_exporter
+    - the migration itself
+  answer: 0
+- id: migration
+  prompt: What was the timestamp prefix of the gift note migration (for example 20261005_0905)?
+  type: text
+  answer_from_var: migration
