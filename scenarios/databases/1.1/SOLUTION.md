@@ -33,5 +33,5 @@ the order requests that triggered them.
 
 ## Curriculum
 
-- [Databases 101](https://www.opsschool.org/databases_101.html)
+- [Databases 101: connections](https://www.opsschool.org/databases_101.html#connections)
 - [Deployment 101](https://www.opsschool.org/deployment_101.html)

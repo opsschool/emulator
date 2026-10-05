@@ -53,4 +53,4 @@ retries instead of stopping all traffic while it waits.
 
 ## Curriculum
 
-- [Databases 201](https://www.opsschool.org/databases_201.html)
+- [Databases 201: locks and long transactions](https://www.opsschool.org/databases_201.html#locks-and-long-transactions)

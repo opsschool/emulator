@@ -29,5 +29,5 @@ or smaller buffers, not more workers.
 
 ## Curriculum
 
+- [Looking at system metrics: vmstat](https://www.opsschool.org/stats_diagnosing.html#vmstat)
 - [Capacity planning](https://www.opsschool.org/capacity_planning.html)
-- [Statistics: diagnosing](https://www.opsschool.org/stats_diagnosing.html)

@@ -28,5 +28,6 @@ read the real file again. If systemd gave up restarting
 
 ## Curriculum
 
+- [init: a service that keeps exiting](https://www.opsschool.org/inits.html#a-service-that-keeps-exiting)
 - [Troubleshooting 101](https://www.opsschool.org/troubleshooting_101.html)
 - [Configuration management 101](https://www.opsschool.org/config_management.html)

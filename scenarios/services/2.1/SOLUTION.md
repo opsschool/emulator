@@ -35,5 +35,5 @@ for every name nginx serves.
 
 ## Curriculum
 
-- [Security 201](https://www.opsschool.org/security_201.html)
+- [Security 201: TLS certificates and chains](https://www.opsschool.org/security_201.html#tls-certificates-and-chains)
 - [HTTP 201](https://www.opsschool.org/http_201.html)

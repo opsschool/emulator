@@ -1,6 +1,6 @@
 category: services
 image: single-node
-curriculum: https://www.opsschool.org/security_201.html
+curriculum: https://www.opsschool.org/security_201.html#tls-certificates-and-chains
 summary: >
   Since last night's certificate renewal, the mobile app and other API
   clients fail to connect to https://api.shop.internal with certificate

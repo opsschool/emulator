@@ -1,6 +1,6 @@
 category: performance
 image: single-node
-curriculum: https://www.opsschool.org/cron_101.html
+curriculum: https://www.opsschool.org/shell_tools_101.html#nice-and-renice
 alerts:
   - "ShopLatency: p99 latency above 80ms (fired and resolved 6 times in the last hour)"
 summary: >

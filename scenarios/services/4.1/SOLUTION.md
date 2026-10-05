@@ -34,4 +34,5 @@ Consider giving scratch space its own filesystem.
 
 ## Curriculum
 
+- [Filesystems 101: when a filesystem is full](https://www.opsschool.org/filesystems_101.html#when-a-filesystem-is-full)
 - [Troubleshooting 101](https://www.opsschool.org/troubleshooting_101.html)

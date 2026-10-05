@@ -29,5 +29,6 @@ it: the comment in the cron file names a ticket.
 
 ## Curriculum
 
+- [Useful shell tools: nice and renice](https://www.opsschool.org/shell_tools_101.html#nice-and-renice)
 - [Cron 101](https://www.opsschool.org/cron_101.html)
 - [Unix 101: processes](https://www.opsschool.org/unix_101.html)

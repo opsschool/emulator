@@ -34,4 +34,5 @@ indexes again (`sys.schema_unused_indexes`).
 
 ## Curriculum
 
+- [Databases 101: indexes and slow queries](https://www.opsschool.org/databases_101.html#indexes-and-slow-queries)
 - [Databases 201](https://www.opsschool.org/databases_201.html)

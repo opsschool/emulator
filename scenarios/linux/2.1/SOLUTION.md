@@ -52,6 +52,6 @@ time.
 
 ## Curriculum
 
-- [Filesystems 101](https://www.opsschool.org/filesystems_101.html)
+- [Filesystems 101: when a filesystem is full](https://www.opsschool.org/filesystems_101.html#when-a-filesystem-is-full)
 - [Logs 101](https://www.opsschool.org/logs_101.html)
 - [Cron 101](https://www.opsschool.org/cron_101.html)

@@ -1,6 +1,6 @@
 category: services
 image: single-node
-curriculum: https://www.opsschool.org/troubleshooting_101.html
+curriculum: https://www.opsschool.org/inits.html#a-service-that-keeps-exiting
 alerts:
   - "ShopHealthCheckFailing: /health through the load balancer has failed for 2m"
   - "ShopErrorRate: more than 5% of requests are failing (5xx)"

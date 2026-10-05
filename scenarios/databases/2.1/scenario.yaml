@@ -1,6 +1,6 @@
 category: databases
 image: single-node
-curriculum: https://www.opsschool.org/databases_201.html
+curriculum: https://www.opsschool.org/databases_101.html#indexes-and-slow-queries
 alerts:
   - "ShopRouteLatency: p99 of GET /customers/{id}/orders above 500ms for 5m"
 summary: >

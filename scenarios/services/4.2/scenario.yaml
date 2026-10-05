@@ -1,6 +1,6 @@
 category: services
 image: single-node
-curriculum: https://www.opsschool.org/architecture_201.html
+curriculum: https://www.opsschool.org/architecture_201.html#timeouts-and-retries
 alerts:
   - "ShopOrderErrors: more than 5% of POST /orders requests are failing (5xx)"
 summary: >

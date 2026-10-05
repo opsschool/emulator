@@ -38,4 +38,4 @@ systemctl start config-sync.timer
 
 ## Curriculum
 
-- [Configuration management](https://www.opsschool.org/config_management.html)
+- [Configuration management: changes by hand on a managed host](https://www.opsschool.org/config_management.html#changes-by-hand-on-a-managed-host)

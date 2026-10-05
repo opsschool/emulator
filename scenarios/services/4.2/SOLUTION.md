@@ -60,4 +60,4 @@ the card network. Better still:
 
 ## Curriculum
 
-- [Architecture 201: fault tolerance](https://www.opsschool.org/architecture_201.html)
+- [Architecture 201: timeouts and retries](https://www.opsschool.org/architecture_201.html#timeouts-and-retries)
