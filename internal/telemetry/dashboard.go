@@ -159,9 +159,9 @@ func Dashboard(scenarioID string, extra []byte) ([]byte, error) {
 		query{`rate(node_vmstat_pswpin[1m])`, "pages in/s"},
 		query{`rate(node_vmstat_pswpout[1m])`, "pages out/s"}), 8, 8)
 	b.place(timeseries("Disk space used", "percentunit",
-		query{`1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}`, "{{mountpoint}}"}), 8, 8)
+		query{`1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay",mountpoint!~"/etc/.+"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay",mountpoint!~"/etc/.+"}`, "{{mountpoint}}"}), 8, 8)
 	b.place(timeseries("Inodes used", "percentunit",
-		query{`1 - node_filesystem_files_free{fstype!~"tmpfs|overlay"} / node_filesystem_files{fstype!~"tmpfs|overlay"}`, "{{mountpoint}}"}), 8, 8)
+		query{`1 - node_filesystem_files_free{fstype!~"tmpfs|overlay",mountpoint!~"/etc/.+"} / node_filesystem_files{fstype!~"tmpfs|overlay",mountpoint!~"/etc/.+"}`, "{{mountpoint}}"}), 8, 8)
 	b.place(timeseries("Disk I/O", "Bps",
 		query{`sum by (device) (rate(node_disk_read_bytes_total[1m]))`, "read {{device}}"},
 		query{`sum by (device) (rate(node_disk_written_bytes_total[1m]))`, "write {{device}}"}), 8, 8)

@@ -93,6 +93,14 @@ pass `--driver container` to `image build`, `start` and `test`. It runs the
 scenario machine as a privileged systemd container; see
 [docs/decisions.md](docs/decisions.md) for how it differs.
 
+## Running it for a group
+
+If you'd like a team or a class to play without installing anything,
+`opsschool serve` runs Ops School on a Kubernetes cluster. Everyone opens
+one web page, types their name, picks a scenario and gets the same session
+page in their browser, and there's a scoreboard for the whole group. See
+[docs/hosted.md](docs/hosted.md) for how to set it up.
+
 ## Status
 
 Milestones M0 to M4 from [docs/design.md](docs/design.md) are built, and

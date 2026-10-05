@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -50,6 +51,8 @@ type Daemon struct {
 	// ExtraListen is another address to serve metrics on, so Prometheus
 	// can reach it from a Docker network. Optional.
 	ExtraListen string
+	// Hosted mode (see docs/decisions.md, "Hosted mode"). All optional.
+	Hosted Hosted
 
 	mu        sync.Mutex
 	st        *State
@@ -63,6 +66,29 @@ type Daemon struct {
 	elapsed prometheus.Gauge
 	hints   prometheus.Gauge
 }
+
+// Hosted configures a daemon that runs in a session pod behind the portal.
+type Hosted struct {
+	// Listen is the address the page and API are served on, instead of
+	// ControlAddr, for the portal to reach.
+	Listen string
+	// Token, sent by the portal in TokenHeader, admits requests from
+	// other hosts. The portal checks who the learner is.
+	Token string
+	// Record saves a finished session's result, instead of the local
+	// results file.
+	Record func(results.Result) error
+	// HomeURL is the portal page the session page links back to.
+	HomeURL string
+	// GrafanaURL replaces the local Grafana address on the page.
+	GrafanaURL string
+	// EndAfter ends a session this long after its time limit runs out,
+	// recording the result, so abandoned sessions don't hold a machine.
+	EndAfter time.Duration
+}
+
+// TokenHeader carries Hosted.Token.
+const TokenHeader = "X-Opsschool-Token"
 
 // Run runs the daemon until the session is stopped or ctx ends.
 func (d *Daemon) Run(ctx context.Context) error {
@@ -78,6 +104,9 @@ func (d *Daemon) Run(ctx context.Context) error {
 
 	srv := &http.Server{Handler: d.handler(), ReadHeaderTimeout: 5 * time.Second}
 	addrs := []string{ControlAddr}
+	if d.Hosted.Listen != "" {
+		addrs = []string{d.Hosted.Listen}
+	}
 	if d.ExtraListen != "" {
 		addrs = append(addrs, d.ExtraListen)
 	}
@@ -137,6 +166,14 @@ func (d *Daemon) syncMetrics() {
 func (d *Daemon) tick(ctx context.Context) {
 	d.mu.Lock()
 	d.syncMetrics()
+	if a := d.Hosted.EndAfter; a > 0 && d.st.OverTime(time.Now().Add(-a)) && !d.verifying {
+		d.mu.Unlock()
+		d.Log.Print("the time limit ran out a while ago; ending the session")
+		if _, err := d.end(true); err != nil {
+			d.Log.Printf("ending the session: %v", err)
+		}
+		return
+	}
 	skip := !d.st.Begun() || d.verifying || d.st.Passed(results.TierMitigated) || d.st.OverTime(time.Now())
 	d.mu.Unlock()
 	if skip {
@@ -212,6 +249,8 @@ type Page struct {
 	Docs       string   `json:"docs,omitempty"`
 	Hints      []string `json:"hints"`
 	HintsTotal int      `json:"hints_total"`
+	// HomeURL, in hosted mode, is the portal page to go back to.
+	HomeURL string `json:"home_url,omitempty"`
 }
 
 // page builds the Page. Call with d.mu held.
@@ -219,9 +258,12 @@ func (d *Daemon) page() Page {
 	sp := d.Scenario.Spec
 	p := Page{
 		ID: sp.ID, Level: sp.Level, MitigateHold: sp.MitigateHold.Duration,
-		GrafanaURL: telemetry.GrafanaURL() + "/d/scenario",
-		HasDocs:    sp.Curriculum != "", HintsTotal: len(d.Scenario.Hints),
+		GrafanaURL: telemetry.GrafanaURL() + "/d/scenario", HomeURL: d.Hosted.HomeURL,
+		HasDocs: sp.Curriculum != "", HintsTotal: len(d.Scenario.Hints),
 		Hints: append([]string{}, d.Scenario.Hints[:min(d.st.HintsUsed, len(d.Scenario.Hints))]...),
+	}
+	if d.Hosted.GrafanaURL != "" {
+		p.GrafanaURL = d.Hosted.GrafanaURL
 	}
 	if d.st.Begun() {
 		p.Alerts, p.Summary = sp.Alerts, strings.TrimSpace(sp.Summary)
@@ -298,28 +340,14 @@ func (d *Daemon) handler() http.Handler {
 	}))
 	mux.HandleFunc("POST /verify", d.begun(d.handleVerify))
 	mux.HandleFunc("POST /stop", func(w http.ResponseWriter, r *http.Request) {
-		d.mu.Lock()
-		res := d.st.Result(time.Now())
-		begun := d.st.Begun()
-		d.mu.Unlock()
-		// A session stopped before it began has nothing to record.
-		if begun {
-			if err := results.Open(d.Home).Append(res); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-		}
-		writeJSON(w, res)
 		// The session page ends the session itself; `opsschool stop`
 		// tears down after the daemon has gone.
-		teardown := r.URL.Query().Get("teardown") == "1"
-		go func() {
-			time.Sleep(200 * time.Millisecond)
-			if teardown {
-				d.teardown()
-			}
-			d.stop()
-		}()
+		res, err := d.end(r.URL.Query().Get("teardown") == "1")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, res)
 	})
 	// The session page. Its files and API answer only on the loopback
 	// address: ExtraListen is for Prometheus, and the page opens a root
@@ -327,15 +355,44 @@ func (d *Daemon) handler() http.Handler {
 	mux.Handle("/", webui.Handler(webui.Config{
 		Shell: d.Machine.ShellCommand, PrometheusURL: telemetry.PrometheusURL(), Log: d.Log,
 	}))
-	return guard(mux)
+	return guard(mux, d.Hosted.Token)
+}
+
+// end records the session's result and stops the daemon, after tearing
+// the session down if asked. A session stopped before it began has nothing
+// to record.
+func (d *Daemon) end(teardown bool) (results.Result, error) {
+	d.mu.Lock()
+	res := d.st.Result(time.Now())
+	begun := d.st.Begun()
+	d.mu.Unlock()
+	if begun {
+		record := d.Hosted.Record
+		if record == nil {
+			record = results.Open(d.Home).Append
+		}
+		if err := record(res); err != nil {
+			return res, err
+		}
+	}
+	go func() {
+		time.Sleep(200 * time.Millisecond)
+		if teardown {
+			d.teardown()
+		}
+		d.stop()
+	}()
+	return res, nil
 }
 
 // guard applies webui.LocalOnly to everything but the metrics Prometheus
-// scrapes, which can come from a Docker network.
-func guard(mux http.Handler) http.Handler {
+// scrapes, which can come from a Docker network, and requests that carry
+// the hosted token.
+func guard(mux http.Handler, token string) http.Handler {
 	local := webui.LocalOnly(mux)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/metrics" || r.URL.Path == "/edge/metrics" {
+		if r.URL.Path == "/metrics" || r.URL.Path == "/edge/metrics" ||
+			token != "" && subtle.ConstantTimeCompare([]byte(r.Header.Get(TokenHeader)), []byte(token)) == 1 {
 			mux.ServeHTTP(w, r)
 			return
 		}
@@ -348,7 +405,7 @@ func guard(mux http.Handler) http.Handler {
 func (d *Daemon) teardown() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
-	env := &Env{Home: d.Home, Machine: d.Machine, Say: func(s string) { d.Log.Print(s) }}
+	env := &Env{Home: d.Home, Machine: d.Machine, Say: func(s string) { d.Log.Print(s) }, ExternalTelemetry: d.Hosted.Listen != ""}
 	if err := env.Teardown(ctx); err != nil {
 		d.Log.Printf("teardown: %v", err)
 	}

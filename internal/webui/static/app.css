@@ -306,3 +306,15 @@ dialog:not([open]) { display: none; }
   .bar { padding: 12px 16px; }
   main { padding: 16px; }
 }
+
+/* Hosted sessions: setting up */
+.starting-bar {
+  height: 6px; margin: 12px 0; border-radius: 3px; background: var(--surface2); overflow: hidden;
+}
+.starting-bar span {
+  display: block; width: 30%; height: 100%; border-radius: 3px; background: var(--accent);
+  animation: starting 1.6s ease-in-out infinite;
+}
+@keyframes starting { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+@media (prefers-reduced-motion: reduce) { .starting-bar span { animation: none; width: 100%; opacity: .4; } }
+#starting-msg.bad { color: var(--bad); }

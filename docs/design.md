@@ -95,6 +95,8 @@ internal/vm/            VM driver interface + Lima implementation
 internal/checks/        check engine: promql, http, script
 internal/results/       results store and scoring
 internal/telemetry/     compose lifecycle, dashboard assembly
+internal/hosted/        the Kubernetes portal and session runner
+deploy/                 the opsschool container image and Kubernetes manifests
 internal/loadgen/       load generator
 demoapp/                the Go demo service ("shop")
 images/single-node/     Lima template + provisioning for the single-node image
@@ -127,6 +129,8 @@ CONTRIBUTING.md
 While a session runs, the daemon also serves a session page at `http://127.0.0.1:19999/` with the same actions: the incident, progress, hints, Verify and End session, a terminal on the scenario machine, and the key dashboard charts. See the decision "A session page in the browser".
 
 Only one scenario runs at a time in the MVP.
+
+`opsschool serve` runs the same sessions for a group from a Kubernetes cluster, with a portal page to start them and a shared scoreboard. See [hosted.md](hosted.md).
 
 The `mitigated` tier is evaluated continuously in the background while a scenario runs. `fixed` is evaluated only on `verify`, because fix verification is disruptive.
 
@@ -440,7 +444,7 @@ Multi-node image, the distributed category, and all L3–L4 scenarios.
 
 ### Later phases (not in scope now)
 
-- Hosted mode: Firecracker microVMs, browser terminal, accounts, hosted scoreboard.
+- Hosted mode: built as a Kubernetes portal with a shared scoreboard; see [hosted.md](hosted.md) and the decision "Hosted mode on Kubernetes". Accounts are left to a sign-in proxy.
 - Kubernetes and cloud scenarios.
 - A software-engineer track framed around "your service is paging," with the app code in scope.
 

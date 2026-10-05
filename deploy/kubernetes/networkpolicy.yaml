@@ -1,0 +1,56 @@
+# Session pods take traffic only from the portal, and the machines' logs.
+# Machine pods take traffic only from session runners. The learner is root
+# on a machine, so this keeps them out of other learners' sessions. The
+# portal takes traffic from anywhere; runners send it their results.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: opsschool-session
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: session
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: portal
+      ports:
+        - port: 19999
+        - port: 13000
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: machine
+      ports:
+        - port: 13100
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: opsschool-machine
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: machine
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: session
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: opsschool-portal
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: portal
+  policyTypes: [Ingress]
+  ingress:
+    # Browsers, through whatever ingress or proxy you put in front.
+    - ports:
+        - port: 8080

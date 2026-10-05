@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ops School</title>
+<link rel="icon" href="ui/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="ui/app.css">
+<link rel="stylesheet" href="portal.css">
+<script>
+  // Apply a saved theme before the page paints.
+  try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+<script type="module" src="portal.js"></script>
+</head>
+<body>
+<header class="bar">
+  <div class="brand"><span class="logo" aria-hidden="true">OS</span><span>Ops School</span></div>
+  <div class="seg" role="tablist" aria-label="Sections">
+    <button role="tab" id="tab-scenarios" aria-selected="true" aria-controls="scenarios-view">Scenarios</button>
+    <button role="tab" id="tab-scoreboard" aria-selected="false" aria-controls="scoreboard-view">Scoreboard</button>
+  </div>
+  <div class="spacer"></div>
+  <span class="muted" id="who" hidden></span>
+  <button class="btn quiet" id="rename" hidden>Change name</button>
+  <button class="btn icon" id="theme" aria-label="Switch between light and dark mode">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></svg>
+  </button>
+</header>
+
+<div class="banner" id="banner" hidden></div>
+
+<main class="portal">
+  <section class="panel" id="name-panel" hidden>
+    <h2>What should we call you?</h2>
+    <p>Your name goes on the scoreboard next to your results. Use the same one each time so your progress adds up.</p>
+    <form class="row" id="name-form">
+      <label class="sr-only" for="name">Your name</label>
+      <input id="name" name="name" autocomplete="username" placeholder="for example, sam or sam@example.com" required maxlength="64">
+      <button class="btn primary" type="submit">Continue</button>
+    </form>
+    <p class="bad small" id="name-error" hidden></p>
+  </section>
+
+  <div id="scenarios-view" role="tabpanel" aria-labelledby="tab-scenarios">
+    <section class="panel current" id="current" hidden>
+      <div>
+        <h2>You have a session running</h2>
+        <p class="muted" id="current-text"></p>
+        <p class="muted small">You can start another scenario once this one ends.</p>
+      </div>
+      <div class="row">
+        <a class="btn primary" id="current-open" href="#">Open it</a>
+        <button class="btn quiet" id="current-discard">Discard it</button>
+      </div>
+    </section>
+
+    <section class="intro">
+      <h1>Pick a scenario</h1>
+      <p>Each one starts a small online shop on its own server, with real traffic and real dashboards.
+        You get a couple of minutes to see it healthy, then something breaks and you get paged.
+        Get customers served again, then find and fix the cause. You'll have a root terminal on
+        the server and the same tools you'd use at work.</p>
+      <p class="muted">Level 1 is a single, fairly obvious fault. Level 4 is several faults that
+        make each other worse. The first hint, a pointer to the right part of the Ops School
+        curriculum, is free.</p>
+    </section>
+
+    <div id="scenarios"></div>
+  </div>
+
+  <div id="scoreboard-view" role="tabpanel" aria-labelledby="tab-scoreboard" hidden>
+    <section class="panel">
+      <h2>Everyone</h2>
+      <p class="muted small">Points add up each person's best result on every scenario they've played.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">#</th><th scope="col">Name</th><th scope="col" class="num">Points</th><th scope="col" class="num">Fixed</th><th scope="col" class="num">Played</th></tr></thead>
+          <tbody id="learners"></tbody>
+        </table>
+      </div>
+      <p class="muted" id="learners-empty" hidden>No results yet. Be the first.</p>
+    </section>
+    <section class="panel">
+      <h2>Fastest fixes</h2>
+      <p class="muted small">The quickest verified fix for each scenario, and how long that same run took to get customers served again.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Scenario</th><th scope="col">Name</th><th scope="col" class="num">Fixed</th><th scope="col" class="num">Mitigated</th></tr></thead>
+          <tbody id="fastest"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</main>
+
+<dialog id="discard-dialog" aria-labelledby="discard-title">
+  <h2 id="discard-title">Discard this session?</h2>
+  <p>We'll delete its machine without recording a result. To keep your result, open the session and press End session there instead.</p>
+  <div class="row end">
+    <button class="btn quiet" id="discard-cancel">Keep it</button>
+    <button class="btn primary" id="discard-confirm">Discard</button>
+  </div>
+</dialog>
+</body>
+</html>

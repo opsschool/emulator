@@ -4,12 +4,16 @@
 package vm
 
 import (
+	"archive/tar"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
+	"path"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -67,6 +71,8 @@ func New(name string) (Driver, error) {
 		return &Lima{}, nil
 	case "container":
 		return &Container{}, nil
+	case "kubernetes":
+		return KubeFromEnv()
 	}
 	return nil, fmt.Errorf("unknown driver %q (lima or container)", name)
 }
@@ -142,4 +148,59 @@ func Interactive(argv []string) error {
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return cmd.Run()
+}
+
+// tarTree writes local (a file or directory) as a tar whose entries are
+// named for remote, relative to /, with its parent directories.
+func tarTree(w io.Writer, local, remote string) error {
+	tw := tar.NewWriter(w)
+	remote = strings.TrimPrefix(path.Clean(remote), "/")
+	var parents []string // outermost first
+	for d := path.Dir(remote); d != "."; d = path.Dir(d) {
+		parents = append([]string{d}, parents...)
+	}
+	for _, d := range parents {
+		if err := tw.WriteHeader(&tar.Header{Typeflag: tar.TypeDir, Name: d + "/", Mode: 0o755}); err != nil {
+			return err
+		}
+	}
+	err := filepath.WalkDir(local, func(p string, e fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(local, p)
+		if err != nil {
+			return err
+		}
+		name := path.Join(remote, filepath.ToSlash(rel))
+		info, err := e.Info()
+		if err != nil {
+			return err
+		}
+		hdr, err := tar.FileInfoHeader(info, "")
+		if err != nil {
+			return err
+		}
+		hdr.Name, hdr.Uid, hdr.Gid, hdr.Uname, hdr.Gname = name, 0, 0, "root", "root"
+		if e.IsDir() {
+			hdr.Name += "/"
+		}
+		if err := tw.WriteHeader(hdr); err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() {
+			return nil
+		}
+		f, err := os.Open(p)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		_, err = io.Copy(tw, f)
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	return tw.Close()
 }

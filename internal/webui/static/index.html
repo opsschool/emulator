@@ -24,6 +24,7 @@
   </div>
   <div class="spacer"></div>
   <div class="actions">
+    <a class="btn quiet" id="home" href="/" hidden>All scenarios</a>
     <a class="btn" href="#hints">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2z"/></svg>
       Hint
@@ -72,6 +73,13 @@
   </div>
 
   <aside class="panel" aria-label="Incident">
+    <section id="starting" hidden>
+      <h2>Setting up your session</h2>
+      <p id="starting-msg"></p>
+      <div class="starting-bar" id="starting-bar" aria-hidden="true"><span></span></div>
+      <p class="muted small" id="starting-help">This usually takes two or three minutes. Once the shop is up, you get a couple of minutes to look around before something breaks.</p>
+    </section>
+
     <section id="waiting" hidden>
       <h2>Getting ready</h2>
       <p>The shop is up and serving normal traffic. Have a look at the dashboard now, so you know what healthy looks like.</p>
@@ -143,7 +151,11 @@
   <div id="end-done" hidden>
     <h2>Session ended</h2>
     <div id="end-result"></div>
-    <p class="muted small">Your result is saved. The scenario machine is being deleted; you can close this tab.</p>
+    <p class="muted small" id="end-gone">Your result is saved. The scenario machine is being deleted; you can close this tab.</p>
+    <div id="end-home" hidden>
+      <p class="muted small">Your result is on the scoreboard. The scenario machine is being deleted.</p>
+      <div class="row end"><a class="btn primary" href="/">Back to the scenarios</a></div>
+    </div>
   </div>
 </dialog>
 </body>
