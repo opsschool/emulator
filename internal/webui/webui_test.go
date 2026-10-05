@@ -154,3 +154,38 @@ func TestTerminalRefusesOtherSites(t *testing.T) {
 		t.Fatalf("cross-origin terminal: %v %v", resp, err)
 	}
 }
+
+func TestStoryEndpoints(t *testing.T) {
+	get := func(c Config, path string) string {
+		srv := httptest.NewServer(Handler(c))
+		defer srv.Close()
+		resp, err := http.Get(srv.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var v any
+		if err := json.NewDecoder(resp.Body).Decode(&v); err != nil || resp.StatusCode != http.StatusOK {
+			t.Fatalf("%s: %d %v", path, resp.StatusCode, err)
+		}
+		b, _ := json.Marshal(v)
+		return string(b)
+	}
+	// Without an image description or changes, the tabs get empty lists.
+	if got := get(Config{}, "/api/changes"); got != "[]" {
+		t.Errorf("changes %s", got)
+	}
+	if got := get(Config{}, "/api/architecture"); got != `{"zones":null}` {
+		t.Errorf("architecture %s", got)
+	}
+	c := Config{
+		Architecture: []byte("zones:\n  - {id: server, name: scenario-vm, components: [{id: nginx, name: nginx, calls: [shop]}]}\n"),
+		Changes:      func() any { return []string{"shop#1"} },
+	}
+	if got := get(c, "/api/architecture"); !strings.Contains(got, `"calls":["shop"]`) {
+		t.Errorf("architecture %s", got)
+	}
+	if got := get(c, "/api/changes"); got != `["shop#1"]` {
+		t.Errorf("changes %s", got)
+	}
+}

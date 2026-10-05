@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/opsschool/emulator/internal/scenario"
 	"github.com/opsschool/emulator/internal/session"
@@ -15,7 +16,7 @@ import (
 
 func init() {
 	register("test", "test <path> [--driver d] [--seed n]", "Run a scenario's full CI verification locally.", runTest)
-	register("image", "image build <image> [--driver d]", "Build a base machine image (once, 10-20 minutes).", runImage)
+	register("image", "image build <image> [--driver d]", "Build a base machine image (once, 10-20 minutes). For hosted mode, --driver kubevirt packages the Lima base, and --driver ec2 builds an AMI.", runImage)
 }
 
 func runTest(e *Env, args []string) error {
@@ -78,10 +79,19 @@ func runImage(e *Env, args []string) error {
 	fs := newFlags(e, "image build")
 	drv := driverFlag(fs)
 	orders := fs.Int("orders", 0, "override the seeded order count (for quick local builds)")
+	subnet := fs.String("subnet", "", "subnet for the builder instance (ec2 only)")
+	groups := fs.String("security-groups", "", "comma-separated security groups for the builder instance (ec2 only)")
 	if err := fs.Parse(args[2:]); err != nil {
 		return err
 	}
-	m, err := vm.New(firstNonEmpty(*drv, e.Getenv("OPSSCHOOL_DRIVER")))
+	name := firstNonEmpty(*drv, e.Getenv("OPSSCHOOL_DRIVER"))
+	kubevirt, ec2 := name == "kubevirt", name == "ec2"
+	if kubevirt || ec2 {
+		// Hosted mode's VMs boot the Lima base's disk; the EC2 build
+		// provisions its own and doesn't need a local driver.
+		name = "lima"
+	}
+	m, err := vm.New(name)
 	if err != nil {
 		return err
 	}
@@ -99,8 +109,22 @@ func runImage(e *Env, args []string) error {
 	}
 	ctx, cancel := signalContext()
 	defer cancel()
-	switch m.Name() {
-	case "lima":
+	switch {
+	case ec2:
+		if *subnet == "" || *groups == "" {
+			return errors.New("--driver ec2 needs --subnet and --security-groups for the builder instance")
+		}
+		ami, err := vm.BuildAMI(ctx, vm.BuildOptions{
+			Root: root, Image: image, Arch: "amd64", SeedOrders: *orders, Fingerprint: fp, Out: e.Stdout,
+		}, vm.AMIOptions{Subnet: *subnet, SecurityGroups: strings.Split(*groups, ",")})
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(e.Stdout, "built %s\n", ami)
+		return nil
+	case kubevirt:
+		return vm.BuildVMDisk(ctx, vm.BuildOptions{Root: root, Image: image, Fingerprint: fp, Out: e.Stdout})
+	case m.Name() == "lima":
 		cmd := exec.CommandContext(ctx, filepath.Join(imgDir, "build.sh"))
 		cmd.Dir = root
 		cmd.Stdout, cmd.Stderr = e.Stdout, e.Stderr

@@ -293,8 +293,8 @@ func (k *Kube) Delete(ctx context.Context) error {
 	return err
 }
 
-// PodIP returns the machine pod's address.
-func (k *Kube) PodIP(ctx context.Context) (string, error) {
+// Address returns the machine pod's address.
+func (k *Kube) Address(ctx context.Context) (string, error) {
 	out, err := k.mustKubectl(ctx, nil, "get", "pod", k.Pod, "-o", "jsonpath={.status.podIP}")
 	if err != nil {
 		return "", err

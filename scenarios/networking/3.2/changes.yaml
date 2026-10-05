@@ -1,0 +1,44 @@
+- id: NET-301
+  title: "Service segment: replace the payments host's network card"
+  author: chris
+  team: Network team
+  before: 10h
+  status: Complete
+  description: |
+    The payments host's network card was replaced last night. Work on the
+    service segment is complete and the payments team confirmed their host
+    is healthy.
+- id: NET-301
+  title: "br-svc: pin the payments host during the card swap"
+  author: chris
+  team: Network team
+  before: 11h
+  when: {variant: pinned}
+  status: Merged and applied
+  description: |
+    Pins the payments host's address on the service segment while its
+    network card is replaced, so nothing else can take it over. Remove
+    after the swap.
+  diff: |
+    --- a/hosts/scenario-vm/network/br-svc.network
+    +++ b/hosts/scenario-vm/network/br-svc.network
+    @@ -8,3 +8,8 @@ RequiredForOnline=no
+     [Network]
+     Address=10.54.0.1/24
+     ConfigureWithoutCarrier=yes
+    +# NET-301: pin the payments host while its NIC is replaced. Remove after
+    +# the swap.
+    +[Neighbor]
+    +Address=10.54.0.20
+    +LinkLayerAddress=52:54:00:36:00:41
+- id: PAY-188
+  title: Keep the previous payments host running for the audit
+  author: dana
+  team: Payments team
+  before: 10h
+  when: {variant: duplicate}
+  status: Done
+  description: |
+    The auditors need the old host's disk and logs as they were, so it
+    stays up on the service segment until the audit closes. Its address was
+    handed to the new host.

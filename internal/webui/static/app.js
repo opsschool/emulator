@@ -376,7 +376,7 @@ $("end-confirm").addEventListener("click", async () => {
 
 function showView(next) {
   view = next;
-  for (const v of ["terminal", "dashboard"]) {
+  for (const v of ["terminal", "dashboard", "changes", "architecture"]) {
     $(`tab-${v}`).setAttribute("aria-selected", String(v === next));
     $(`${v}-view`).hidden = v !== next;
   }
@@ -386,9 +386,12 @@ function showView(next) {
     active.term.focus();
   }
   if (next === "dashboard") loadCharts();
+  if (next === "changes") loadChanges();
+  if (next === "architecture") loadArchitecture();
 }
-$("tab-terminal").addEventListener("click", () => showView("terminal"));
-$("tab-dashboard").addEventListener("click", () => showView("dashboard"));
+for (const v of ["terminal", "dashboard", "changes", "architecture"]) {
+  $(`tab-${v}`).addEventListener("click", () => showView(v));
+}
 
 // ---- Terminals ----
 
@@ -741,6 +744,7 @@ function plot(c, yLabels, svg, xLabels, overlay) {
 }
 
 setInterval(() => { if (view === "dashboard" && !ended) loadCharts(); }, 15000);
+setInterval(() => { if (view === "changes" && !ended) loadChanges(); }, 15000);
 
 // ---- Start ----
 
@@ -748,3 +752,157 @@ setInterval(() => { if (view === "dashboard" && !ended) loadCharts(); }, 15000);
 poll();
 setInterval(poll, 2000);
 setInterval(tickClock, 1000);
+
+// ---- Recent changes ----
+
+let changesShown = ""; // the last list drawn, to keep open diffs open
+
+function ago(t) {
+  const m = Math.max(0, Math.round((Date.now() - new Date(t).getTime()) / 60000));
+  if (m < 1) return "just now";
+  if (m < 60) return `${m} min ago`;
+  const h = Math.floor(m / 60);
+  if (h < 48) return `${h} h ${m % 60} min ago`;
+  return `${Math.floor(h / 24)} days ago`;
+}
+
+function clockTime(t) {
+  return new Date(t).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+async function loadChanges() {
+  let list;
+  try {
+    const r = await fetch("api/changes");
+    if (!r.ok) throw new Error(await r.text());
+    list = await r.json();
+  } catch (e) {
+    return; // the next refresh tries again
+  }
+  const key = list.map((c) => c.id).join(" ");
+  if (key === changesShown) {
+    // Same changes: only the times move.
+    for (const t of document.querySelectorAll("#changes time")) t.textContent = ago(t.dateTime);
+    return;
+  }
+  changesShown = key;
+  $("changes-empty").hidden = list.length > 0;
+  $("changes").replaceChildren(...list.map(drawChange));
+}
+
+function drawChange(c) {
+  const li = el("li", "change");
+  const head = el("div", "change-head");
+  head.append(el("span", "change-id mono", c.id), el("strong", "change-title", c.title));
+  const meta = el("p", "change-meta muted small");
+  const when = el("time", "", ago(c.at));
+  when.dateTime = c.at;
+  when.title = clockTime(c.at);
+  meta.append(`${c.author}${c.team ? ` (${c.team})` : ""} · `, when);
+  if (c.status) meta.append(" · ", el("span", "change-status", c.status));
+  li.append(head, meta);
+  if (c.description) li.append(el("p", "change-desc", c.description.trim()));
+  if (c.diff) {
+    const d = el("details", "diff");
+    const files = (c.diff.match(/^\+\+\+ /gm) || []).length;
+    d.append(el("summary", "", files === 1 ? "Show the change (1 file)" : files > 1 ? `Show the change (${files} files)` : "Show the change"));
+    const pre = el("pre", "mono");
+    for (const line of c.diff.replace(/\n$/, "").split("\n")) {
+      let cls = "";
+      if (line.startsWith("+++") || line.startsWith("---")) cls = "file";
+      else if (line.startsWith("@@")) cls = "hunk";
+      else if (line.startsWith("+")) cls = "add";
+      else if (line.startsWith("-")) cls = "del";
+      pre.append(el("span", cls, line + "\n"));
+    }
+    d.append(pre);
+    li.append(d);
+  }
+  return li;
+}
+
+// ---- Architecture ----
+
+let arch = null; // the image's architecture, loaded once
+let archSelected = null;
+
+async function loadArchitecture() {
+  if (arch) return;
+  try {
+    const r = await fetch("api/architecture");
+    if (!r.ok) throw new Error(await r.text());
+    arch = await r.json();
+  } catch (e) {
+    $("zones").replaceChildren(el("p", "muted", "Couldn't load the architecture. Try the tab again in a moment."));
+    return;
+  }
+  drawArchitecture();
+}
+
+function components() {
+  return (arch.zones || []).flatMap((z) => (z.components || []).map((c) => ({ ...c, zone: z })));
+}
+
+function drawArchitecture() {
+  const all = components();
+  const byID = Object.fromEntries(all.map((c) => [c.id, c]));
+  // The main request path, from the first component, following first calls.
+  const path = [];
+  for (let c = all[0]; c && !path.includes(c); c = byID[(c.calls || [])[0]]) path.push(c);
+  $("arch-path").replaceChildren(el("span", "muted", "A customer's request goes: "),
+    ...path.flatMap((c, i) => [i ? el("span", "arrow", " → ") : "", el("strong", "", c.name)]));
+  const zones = (arch.zones || []).map((z) => {
+    const box = el("section", `zone zone-${z.id}`);
+    const head = el("div", "zone-head");
+    head.append(el("h3", "", z.name), el("p", "muted small", z.about || ""));
+    const grid = el("div", "comps");
+    for (const c of z.components || []) {
+      const b = el("button", "comp");
+      b.type = "button";
+      b.dataset.id = c.id;
+      b.setAttribute("aria-pressed", "false");
+      b.append(el("strong", "", c.name));
+      if (c.unit) b.append(el("span", "mono small muted", c.unit));
+      b.addEventListener("click", () => selectComponent(c.id));
+      grid.append(b);
+    }
+    box.append(head, grid);
+    return box;
+  });
+  $("zones").replaceChildren(...zones);
+  if (archSelected) selectComponent(archSelected);
+}
+
+function selectComponent(id) {
+  archSelected = id;
+  const all = components();
+  const c = all.find((x) => x.id === id);
+  if (!c) return;
+  const callers = all.filter((x) => (x.calls || []).includes(id));
+  for (const b of document.querySelectorAll(".comp")) {
+    const bid = b.dataset.id;
+    b.setAttribute("aria-pressed", String(bid === id));
+    b.classList.toggle("callee", (c.calls || []).includes(bid));
+    b.classList.toggle("caller", callers.some((x) => x.id === bid));
+  }
+  const name = (cid) => (all.find((x) => x.id === cid) || { name: cid }).name;
+  const d = $("arch-detail");
+  const parts = [el("h3", "", c.name), el("p", "", c.about || "")];
+  const row = (label, items, mono = true) => {
+    if (!items || !items.length) return;
+    parts.push(el("h4", "", label));
+    const ul = el("ul", mono ? "mono small" : "small");
+    for (const i of items) ul.append(el("li", "", i));
+    parts.push(ul);
+  };
+  row("Runs on", [c.where || c.zone.name], false);
+  row("Service", c.unit ? [c.unit] : []);
+  row("Listens on", c.listens);
+  row("Configuration", c.config);
+  row("Files", c.files);
+  row("Logs", c.logs);
+  row("Look at it with", c.observe);
+  row("Sends requests to", (c.calls || []).map(name), false);
+  row("Gets requests from", callers.map((x) => x.name), false);
+  d.replaceChildren(...parts);
+}

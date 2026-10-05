@@ -1,0 +1,37 @@
+- id: SEC-140
+  title: "Firewall: drop packets that belong to no connection"
+  author: jordan
+  team: Security
+  before: 18h
+  status: Applied in the maintenance window
+  description: |
+    Turns on stateful filtering: the firewall drops packets that don't
+    belong to any known connection.
+  diff: |
+    --- a/etc/iptables/rules.v4
+    +++ b/etc/iptables/rules.v4
+    @@ -3,6 +3,8 @@
+     :INPUT ACCEPT [0:0]
+     :FORWARD ACCEPT [0:0]
+     :OUTPUT ACCEPT [0:0]
+    +# Drop packets that belong to no known connection (SEC-140).
+    +-A INPUT -m conntrack --ctstate INVALID -j DROP
+     # MySQL and Redis are local-only.
+     -A INPUT ! -i lo -p tcp -m tcp --dport 3306 -j DROP
+     -A INPUT ! -i lo -p tcp -m tcp --dport 6379 -j DROP
+- id: PERF-77
+  title: Trim kernel tables to what the host uses
+  author: lee
+  team: Performance
+  before: 18h
+  status: Applied in the maintenance window
+  description: |
+    Part of the memory-footprint work. Sized from measurements on this
+    host: it tracks a few hundred connections at a time (640 at 03:00).
+  diff: |
+    --- /dev/null
+    +++ b/etc/sysctl.d/60-kernel-tables.conf
+    @@ -0,0 +1,3 @@
+    +# PERF-77: trim kernel tables to what this host uses. It tracks a few
+    +# hundred connections at a time (measured 640 at 03:00).
+    +net.netfilter.nf_conntrack_max = ${max}

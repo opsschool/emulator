@@ -1,0 +1,19 @@
+- id: OPS-2210
+  title: Raise worker concurrency to clear the order backlog
+  author: alex
+  team: SRE (on call)
+  before: 15m
+  status: Applied; worker restarted
+  description: |
+    About 40,000 orders queued up during yesterday's incident and the
+    worker clears them slowly. More workers until the backlog is gone.
+  diff: |
+    --- a/etc/shop/shop.env
+    +++ b/etc/shop/shop.env
+    @@ -14,4 +14,5 @@
+     SHOP_CACHE_TTL=60s
+    -SHOP_WORKER_CONCURRENCY=4
+    +# Raised from 4 to clear the order backlog (OPS-2210).
+    +SHOP_WORKER_CONCURRENCY=${concurrency}
+     SHOP_WORKER_BUFFER_MB=256
+     SHOP_PAYMENTS_URL=http://payments.shop.internal:8081

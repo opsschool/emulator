@@ -59,8 +59,15 @@ type Kube struct {
 	// ServiceAccount runs the session pods. It needs to create, read and
 	// delete pods, and exec into them.
 	ServiceAccount string
-	// Machine settings; see vm.Kube.
+	// MachineDriver is how runners make machines: "kubevirt" for a
+	// KubeVirt VM (vm.KubeVirt), "ec2" for an EC2 instance (vm.EC2) or
+	// "kubernetes" for a privileged pod (vm.Kube).
+	MachineDriver string
+	// Machine settings; see vm.Kube and vm.KubeVirt.
 	RuntimeClass, MachineCPU, MachineMemory, MachineMemoryLimit string
+	// MachineEnv is more environment for the runner's machine driver, such
+	// as the EC2 driver's settings.
+	MachineEnv map[string]string
 }
 
 const (
@@ -176,8 +183,8 @@ func parsePods(b []byte) ([]Session, error) {
 // RunnerPod is a session's pod: the runner, which plays `opsschool start`
 // and the session daemon, and the telemetry stack beside it. Everything
 // in it shares the pod's loopback, as the CLI and the stack share a
-// laptop's, and the runner forwards the VM's usual ports to the machine
-// pod, as Lima does.
+// laptop's, and the runner forwards the VM's usual ports to the machine,
+// as Lima does.
 func (k *Kube) RunnerPod(s Session) map[string]any {
 	field := func(name, path string) map[string]any {
 		return map[string]any{"name": name, "valueFrom": map[string]any{"fieldRef": map[string]any{"fieldPath": path}}}
@@ -199,6 +206,7 @@ func (k *Kube) RunnerPod(s Session) map[string]any {
 		val("OPSSCHOOL_MACHINE_IMAGE", k.MachineImage),
 	}
 	for name, v := range map[string]string{
+		"OPSSCHOOL_MACHINE_DRIVER":       k.MachineDriver,
 		"OPSSCHOOL_RUNTIME_CLASS":        k.RuntimeClass,
 		"OPSSCHOOL_MACHINE_CPU":          k.MachineCPU,
 		"OPSSCHOOL_MACHINE_MEMORY":       k.MachineMemory,
@@ -207,6 +215,9 @@ func (k *Kube) RunnerPod(s Session) map[string]any {
 		if v != "" {
 			env = append(env, val(name, v))
 		}
+	}
+	for name, v := range k.MachineEnv {
+		env = append(env, val(name, v))
 	}
 	mount := func(name, path string, sub ...string) map[string]any {
 		m := map[string]any{"name": name, "mountPath": path}

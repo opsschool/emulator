@@ -22,7 +22,13 @@ type Config struct {
 	Shell func() []string
 	// PrometheusURL is queried for the dashboard charts.
 	PrometheusURL string
-	Log           *log.Logger
+	// Architecture is the image's architecture.yaml, for the Architecture
+	// tab. Optional.
+	Architecture []byte
+	// Changes returns the Recent changes tab's list, newest first.
+	// Optional.
+	Changes func() any
+	Log     *log.Logger
 }
 
 // Handler serves the page, its files, the terminal and the charts.
@@ -31,6 +37,8 @@ func Handler(c Config) http.Handler {
 	mux.Handle("GET /", Static())
 	mux.HandleFunc("GET /api/terminal", c.terminal)
 	mux.HandleFunc("GET /api/charts", c.charts)
+	mux.HandleFunc("GET /api/architecture", c.architecture)
+	mux.HandleFunc("GET /api/changes", c.changes)
 	return mux
 }
 

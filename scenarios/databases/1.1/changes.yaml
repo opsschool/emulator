@@ -1,0 +1,28 @@
+- id: shop#1203
+  title: Release 2.4.0
+  author: deploy-bot
+  team: Shop developers
+  before: 3h
+  status: Deployed to production
+  description: |
+    Release 2.4.0:
+    - Checkout: check stock when the order is placed, not when it's paid.
+    - Orders for discontinued products now get a clear error.
+    - Raise the database connection pool to 200 so checkout doesn't wait
+      for a connection at peak.
+  diff: |
+    --- a/deploy/production/shop.env
+    +++ b/deploy/production/shop.env
+    @@ -8,6 +8,6 @@
+     SHOP_DB_REPLICA_DSN=
+     SHOP_READ_FROM_REPLICA=false
+    -SHOP_DB_POOL_SIZE=20
+    +SHOP_DB_POOL_SIZE=200
+     SHOP_DB_MAX_IDLE=10
+     SHOP_DB_QUERY_TIMEOUT=5s
+     SHOP_REDIS_ADDR=127.0.0.1:6379
+    --- a/VERSION
+    +++ b/VERSION
+    @@ -1 +1 @@
+    -2.3.0
+    +2.4.0

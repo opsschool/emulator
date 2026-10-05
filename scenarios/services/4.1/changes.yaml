@@ -1,0 +1,27 @@
+- id: THUMB-77
+  title: Upgrade the thumbnail service to 1.5.0
+  author: deploy-bot
+  team: Catalog team
+  before: 25m
+  status: Deployed to production
+  description: |
+    Vendor release 1.5.0. From the vendor's release notes:
+    - Large photos are decoded through a scratch file instead of memory,
+      so big uploads no longer get the service killed for using too much
+      memory.
+    - Faster resizing for photos under 4 megapixels.
+  diff: |
+    --- a/deploy/shop-thumbs/VERSION
+    +++ b/deploy/shop-thumbs/VERSION
+    @@ -1 +1 @@
+    -1.4.2
+    +1.5.0
+- id: CAT-940
+  title: New product photos for the autumn range
+  author: Wally
+  team: Catalog team
+  before: 24m
+  status: Uploaded
+  description: |
+    Uploaded this season's product photos from the studio camera. The
+    thumbnails should appear on the catalog within a few minutes.

@@ -42,11 +42,14 @@ spec:
           args:
             - opsschool
             - serve
-            - --machine-image=opsschool/{image}:base
+            # Each session gets a KubeVirt VM booted from this disk image.
+            - --machine-image=opsschool/{image}-vm:base
+            # On a cluster without KubeVirt, use privileged pods instead
+            # (scenarios marked needs_vm are left out):
+            # - --machines=pods
+            # - --machine-image=opsschool/{image}:base
             # With a sign-in proxy in front, name the header it sets:
             # - --user-header=X-Forwarded-Email
-            # Isolate machines in their own kernel, if the cluster has Kata:
-            # - --runtime-class=kata
           env:
             - name: OPSSCHOOL_IMAGE
               value: opsschool/opsschool:dev

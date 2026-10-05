@@ -12,6 +12,7 @@ COPY cmd cmd
 COPY internal internal
 COPY telemetry telemetry
 COPY demoapp demoapp
+COPY images images
 RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /opsschool ./cmd/opsschool
 
 FROM ubuntu:24.04
@@ -22,7 +23,7 @@ ARG KUBECTL_VERSION=v1.35.0
 ARG KUBECTL_SHA256_amd64=a2e984a18a0c063279d692533031c1eff93a262afcc0afdc517375432d060989
 ARG KUBECTL_SHA256_arm64=58f82f9fe796c375c5c4b8439850b0f3f4d401a52434052f2df46035a8789e25
 RUN apt-get update -q \
- && apt-get install -y -q --no-install-recommends ca-certificates curl \
+ && apt-get install -y -q --no-install-recommends ca-certificates curl openssh-client \
  && curl -fsSLo /usr/local/bin/kubectl "https://dl.k8s.io/release/$KUBECTL_VERSION/bin/linux/$TARGETARCH/kubectl" \
  && sum="KUBECTL_SHA256_$TARGETARCH" \
  && echo "${!sum}  /usr/local/bin/kubectl" | sha256sum -c - \
@@ -32,7 +33,9 @@ COPY --from=build /opsschool /usr/local/bin/opsschool
 COPY scenarios /usr/share/opsschool/scenarios
 ENV OPSSCHOOL_SCENARIOS=/usr/share/opsschool/scenarios \
     OPSSCHOOL_HOME=/var/lib/opsschool
-RUN install -d -o 65532 -g 65532 /var/lib/opsschool
+# ssh and ssh-keygen look the user up, so it needs a passwd entry.
+RUN groupadd --system --gid 65532 opsschool \
+ && useradd --system --uid 65532 --gid 65532 --home-dir /var/lib/opsschool --create-home --shell /usr/sbin/nologin opsschool
 USER 65532:65532
 ENTRYPOINT []
 CMD ["opsschool", "serve"]
