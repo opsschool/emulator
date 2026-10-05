@@ -20,7 +20,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@v5
         with:
@@ -42,8 +42,16 @@ jobs:
           echo "Scenarios: $dirs"
       - name: Build opsschool
         run: go build -o bin/opsschool ./cmd/opsschool
+      # The runner has MySQL installed, and its AppArmor profile attaches
+      # to /usr/sbin/mysqld in the scenario container too, where it denies
+      # the data directory on /data.
+      - name: Unload the runner's MySQL AppArmor profile
+        run: sudo apparmor_parser -R /etc/apparmor.d/usr.sbin.mysqld || true
       - name: Build the base image
         run: bin/opsschool image build single-node --driver container
+      - name: Show AppArmor denials
+        if: failure()
+        run: sudo dmesg | grep -i apparmor | tail -20 || true
       - name: Verify scenarios
         run: |
           for d in ${{ steps.pick.outputs.dirs }}; do
