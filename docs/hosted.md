@@ -160,20 +160,39 @@ If your cluster can't run VMs, for example EKS without metal nodes, each
 session can get an EC2 instance instead. It's the same machine as the
 KubeVirt VM, built as an AMI.
 
-Build the AMI from a machine with AWS credentials. The build starts an
-instance from Canonical's Ubuntu 26.04 AMI, provisions it as the Lima
-build does, saves it as an AMI and terminates it. The machine you run
-the build from must reach the instance on port 22, so give it a subnet
-with public addresses and a security group that lets you in, or run the
-build from inside the VPC:
+Make the disk image on the machine where you build the Lima VM. It boots
+a copy of the Lima VM, adds what EC2 needs (NVMe and ENA drivers, and the
+network card named eth0), and writes the disk to a file:
 
 ```
-bin/opsschool image build single-node --driver ec2 \
-  --subnet subnet-0123 --security-groups sg-0123   # 20-30 minutes
+bin/opsschool image build single-node                  # the Lima VM, if it's not built
+bin/opsschool image build single-node --driver ec2     # writes opsschool-single-node.raw
 ```
 
-The AMI is tagged `opsschool:image=single-node` and with the image's
-fingerprint. Sessions use the newest one in the account and region.
+The file is a 20 GB raw disk, but sparse: only about 5 GB of it is data.
+Turn it into an AMI however your organization does that. One way, with
+AWS's [coldsnap](https://github.com/awslabs/coldsnap), which uploads only
+the data and needs no S3 bucket or service role:
+
+```
+snap=$(coldsnap upload opsschool-single-node.raw)
+aws ec2 wait snapshot-completed --snapshot-ids $snap
+aws ec2 register-image --name opsschool-single-node-$(date +%Y%m%d) \
+  --architecture x86_64 --boot-mode uefi --ena-support \
+  --root-device-name /dev/sda1 \
+  --block-device-mappings "DeviceName=/dev/sda1,Ebs={SnapshotId=$snap,VolumeType=gp3,DeleteOnTermination=true}" \
+  --tag-specifications 'ResourceType=image,Tags=[{Key=opsschool:image,Value=single-node},{Key=opsschool:fingerprint,Value=<fingerprint>}]'
+```
+
+The build prints the fingerprint. coldsnap needs AWS credentials that
+allow `ebs:StartSnapshot`, `ebs:PutSnapshotBlock` and
+`ebs:CompleteSnapshot`; `register-image` needs `ec2:RegisterImage` and
+`ec2:CreateTags`. [VM Import](https://docs.aws.amazon.com/vm-import/latest/userguide/vmimport-import-snapshot.html)
+(`aws ec2 import-snapshot` from S3, with `Format=RAW`) works too, then
+the same `register-image`.
+
+Sessions use the newest AMI tagged `opsschool:image=single-node` in the
+portal's account and region. To pin one, pass `--machine-image=ami-...`.
 
 Then run the portal with:
 

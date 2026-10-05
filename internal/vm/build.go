@@ -138,11 +138,52 @@ func BuildContainerBase(ctx context.Context, o BuildOptions) error {
 // image name: the Lima base's disk, packaged as KubeVirt expects.
 func VMDiskImage(image string) string { return "opsschool/" + image + "-vm:base" }
 
-// BuildVMDisk packages the Lima base as a KubeVirt container disk. It
-// needs a current Lima base: it copies a clone of it, cleaned of Lima's
-// agent, user and network config by images/vm-export.sh, so the same
-// machine boots under Lima on a laptop and KubeVirt in hosted mode.
+// BuildVMDisk packages the Lima base as a KubeVirt container disk, so the
+// same machine boots under Lima on a laptop and KubeVirt in hosted mode.
 func BuildVMDisk(ctx context.Context, o BuildOptions) error {
+	return exportLimaDisk(ctx, o, "kubevirt", func(step stepFunc, disk string) error {
+		stage, err := os.MkdirTemp("", "opsschool-vmdisk-")
+		if err != nil {
+			return err
+		}
+		defer os.RemoveAll(stage)
+		if err := step("copying the disk (a few minutes)", "qemu-img", "convert", "-c", "-O", "qcow2",
+			disk, filepath.Join(stage, "disk.qcow2")); err != nil {
+			return err
+		}
+		// KubeVirt's container disk format: the image under /disk, owned by
+		// the qemu user (107).
+		dockerfile := "FROM scratch\nADD --chown=107:107 disk.qcow2 /disk/\nLABEL " + FingerprintLabel + "=" + o.Fingerprint + "\n"
+		if err := os.WriteFile(filepath.Join(stage, "Dockerfile"), []byte(dockerfile), 0o644); err != nil {
+			return err
+		}
+		return step("saving "+VMDiskImage(o.Image), "docker", "build", "-t", VMDiskImage(o.Image), stage)
+	})
+}
+
+// EC2DiskFile names the raw disk BuildEC2Disk writes for an image.
+func EC2DiskFile(image string) string { return "opsschool-" + image + ".raw" }
+
+// BuildEC2Disk writes the Lima base as a raw disk image, prepared to boot
+// on EC2, for the user to turn into an AMI (see docs/hosted.md). It
+// returns the file's path.
+func BuildEC2Disk(ctx context.Context, o BuildOptions, outDir string) (string, error) {
+	out := filepath.Join(outDir, EC2DiskFile(o.Image))
+	err := exportLimaDisk(ctx, o, "ec2", func(step stepFunc, disk string) error {
+		// Raw, the format both coldsnap and VM Import take. qemu-img
+		// writes it sparse, so it takes only the space the data does.
+		return step("writing "+out+" (a few minutes)", "qemu-img", "convert", "-O", "raw", disk, out)
+	})
+	return out, err
+}
+
+type stepFunc func(msg string, name string, args ...string) error
+
+// exportLimaDisk boots a clone of the Lima base, removes Lima's agent,
+// user and network config with images/vm-export.sh (which also prepares
+// the disk for the target: "kubevirt" or "ec2"), and hands the powered-off
+// clone's disk to save. It needs a current Lima base.
+func exportLimaDisk(ctx context.Context, o BuildOptions, target string, save func(step stepFunc, disk string) error) error {
 	l := &Lima{}
 	built, fp, err := l.Base(ctx, o.Image)
 	if err != nil {
@@ -180,7 +221,7 @@ func BuildVMDisk(ctx context.Context, o BuildOptions) error {
 		return err
 	}
 	if err := step("removing Lima's agent, user and network config", "limactl", "shell", clone,
-		"sudo", "bash", "/tmp/vm-export.sh", strings.TrimSpace(user)); err != nil {
+		"sudo", "bash", "/tmp/vm-export.sh", strings.TrimSpace(user), target); err != nil {
 		return err
 	}
 	fmt.Fprintln(o.Out, "==> waiting for the clone to power off")
@@ -203,26 +244,11 @@ func BuildVMDisk(ctx context.Context, o BuildOptions) error {
 	if err != nil {
 		return err
 	}
-	stage, err := os.MkdirTemp("", "opsschool-vmdisk-")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(stage)
 	// Lima 2 calls the disk "disk", older releases "diffdisk" (copy on
 	// write over "basedisk"). Converting flattens either one.
 	disk := filepath.Join(strings.TrimSpace(dir), "disk")
 	if _, err := os.Stat(disk); err != nil {
 		disk = filepath.Join(strings.TrimSpace(dir), "diffdisk")
 	}
-	if err := step("copying the disk (a few minutes)", "qemu-img", "convert", "-c", "-O", "qcow2",
-		disk, filepath.Join(stage, "disk.qcow2")); err != nil {
-		return err
-	}
-	// KubeVirt's container disk format: the image under /disk, owned by
-	// the qemu user (107).
-	dockerfile := "FROM scratch\nADD --chown=107:107 disk.qcow2 /disk/\nLABEL " + FingerprintLabel + "=" + o.Fingerprint + "\n"
-	if err := os.WriteFile(filepath.Join(stage, "Dockerfile"), []byte(dockerfile), 0o644); err != nil {
-		return err
-	}
-	return step("saving "+VMDiskImage(o.Image), "docker", "build", "-t", VMDiskImage(o.Image), stage)
+	return save(step, disk)
 }

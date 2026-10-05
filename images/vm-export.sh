@@ -3,10 +3,24 @@
 # removes Lima's agent, user and network config, resets cloud-init so the
 # next boot configures the machine from its new host's data, and powers
 # off. Run as root in the clone; `opsschool image build --driver kubevirt`
-# runs it. The clone is thrown away after its disk is copied.
+# runs it, and `--driver ec2` with "ec2", which also prepares it for EC2.
+# The clone is thrown away after its disk is copied.
 set -euo pipefail
 
-lima_user=${1:?usage: vm-export.sh <lima user>}
+lima_user=${1:?usage: vm-export.sh <lima user> [kubevirt|ec2]}
+target=${2:-kubevirt}
+
+if [[ $target == ec2 ]]; then
+  # EC2 instances present their disk as NVMe and their network card as
+  # ENA. The initrd was built on a virtio VM, so add those drivers.
+  echo 'add_drivers+=" nvme ena "' >/etc/dracut.conf.d/90-opsschool-ec2.conf
+  dracut --force --regenerate-all
+  # The image's scripts expect the network card to be eth0. Lima and
+  # KubeVirt get that from cloud-init; on EC2 the kernel names it.
+  # shellcheck disable=SC2016 # grub expands it, not bash
+  echo 'GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT net.ifnames=0"' >/etc/default/grub.d/90-opsschool-eth0.cfg
+  update-grub
+fi
 
 systemctl disable --now lima-guestagent.service 2>/dev/null || true
 rm -f /etc/systemd/system/lima-guestagent.service /usr/local/bin/lima-guestagent

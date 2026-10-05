@@ -18,12 +18,12 @@ import (
 
 // EC2 runs the scenario machine as an EC2 instance, for hosted mode where
 // the cluster can't run VMs itself: a portal on EKS without metal nodes,
-// for example. Each session gets an instance from an AMI built by
-// BuildAMI, the same machine Lima and KubeVirt boot, and the runner
+// for example. Each session gets an instance from an AMI made from
+// BuildEC2Disk's disk, the same machine Lima and KubeVirt boot, and the runner
 // reaches it over SSH on the VPC network. See docs/hosted.md.
 type EC2 struct {
-	// Image is an AMI ID, or "" to use the newest AMI that BuildAMI made
-	// for the scenario's image in this account and region.
+	// Image is an AMI ID, or "" to use the newest AMI tagged with the
+	// scenario's image (EC2ImageTag) in this account and region.
 	Image        string
 	InstanceType string
 	// Subnet and SecurityGroups place the instance. The groups must let the
@@ -49,9 +49,9 @@ type EC2 struct {
 // depend on the memory size.
 const (
 	EC2InstanceType = "c7i.large" // 2 vCPUs, 4 GiB
-	// ec2ImageTag and ec2FingerprintTag mark AMIs that BuildAMI made.
-	ec2ImageTag       = "opsschool:image"
-	ec2FingerprintTag = "opsschool:fingerprint"
+	// EC2ImageTag and EC2FingerprintTag mark AMIs made from BuildEC2Disk's disk.
+	EC2ImageTag       = "opsschool:image"
+	EC2FingerprintTag = "opsschool:fingerprint"
 	ec2SessionTag     = "opsschool:session"
 )
 
@@ -119,14 +119,14 @@ func (e *EC2) Base(ctx context.Context, image string) (bool, string, error) {
 	if err != nil || ami == nil {
 		return false, "", err
 	}
-	return true, tag(ami.Tags, ec2FingerprintTag), nil
+	return true, tag(ami.Tags, EC2FingerprintTag), nil
 }
 
-// newestAMI finds the latest AMI that BuildAMI made for an image, or nil.
+// newestAMI finds the latest AMI tagged with an image, or nil.
 func newestAMI(ctx context.Context, c *ec2.Client, image string) (*types.Image, error) {
 	out, err := c.DescribeImages(ctx, &ec2.DescribeImagesInput{
 		Owners:  []string{"self"},
-		Filters: []types.Filter{{Name: aws.String("tag:" + ec2ImageTag), Values: []string{image}}},
+		Filters: []types.Filter{{Name: aws.String("tag:" + EC2ImageTag), Values: []string{image}}},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("finding the %s AMI: %w", image, err)
@@ -193,7 +193,7 @@ func (e *EC2) Create(ctx context.Context, image string) error {
 			return err
 		}
 		if img == nil {
-			return fmt.Errorf("no AMI for %s in this account and region; build one with opsschool image build %s --driver ec2", image, image)
+			return fmt.Errorf("no AMI for %s in this account and region; see \"EC2 machines\" in docs/hosted.md", image)
 		}
 		ami = aws.ToString(img.ImageId)
 	}

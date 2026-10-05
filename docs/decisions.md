@@ -44,18 +44,21 @@ clusters without KVM. The session runner still runs in the cluster and
 works the instance over SSH, as with KubeVirt, so the rest of hosted mode
 is unchanged.
 
-- The AMI is built on EC2 (`opsschool image build <image> --driver ec2`)
-  from Canonical's Ubuntu AMI with the image's own provision.sh and
-  smoke.sh, not imported from the Lima disk. The Lima disk's initrd is
-  built on a virtio machine without the NVMe and ENA drivers a Nitro
-  instance needs to boot, and an import needs a `vmimport` service role.
-- The image's scripts expect the network card to be eth0, so the AMI boots
-  with `net.ifnames=0`.
+- `opsschool image build <image> --driver ec2` writes a raw disk image,
+  not an AMI. The project owner's call: building on an EC2 instance needs
+  a network path to it, which is hard to set up securely in a corporate
+  account, and how a disk becomes an AMI (coldsnap, VM Import, a pipeline)
+  differs between organizations. docs/hosted.md shows the coldsnap way.
+- The disk is the Lima VM's, exported as for KubeVirt, with two changes
+  for EC2: its initrd gets the NVMe and ENA drivers (it was built on a
+  virtio VM), and it boots with `net.ifnames=0`, because the image's
+  scripts expect the network card to be eth0 and on EC2 nothing renames it.
 - An instance whose runner dies would run, and cost money, forever. Each
   one sets a timer at boot to power off half an hour after the portal's
   `--max-age`, and powering off terminates it.
 - Not tested against AWS: no credentials were available. The request
-  building and AMI lookup have unit tests.
+  building and AMI lookup have unit tests, and the disk was booted locally
+  in QEMU on an NVMe drive.
 
 ## 2026-10-05: Architecture and Recent changes tabs
 

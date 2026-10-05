@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 
 	"github.com/opsschool/emulator/internal/scenario"
 	"github.com/opsschool/emulator/internal/session"
@@ -16,7 +15,7 @@ import (
 
 func init() {
 	register("test", "test <path> [--driver d] [--seed n]", "Run a scenario's full CI verification locally.", runTest)
-	register("image", "image build <image> [--driver d]", "Build a base machine image (once, 10-20 minutes). For hosted mode, --driver kubevirt packages the Lima base, and --driver ec2 builds an AMI.", runImage)
+	register("image", "image build <image> [--driver d]", "Build a base machine image (once, 10-20 minutes). For hosted mode, --driver kubevirt packages the Lima base as a KubeVirt disk, and --driver ec2 as a raw disk for an AMI.", runImage)
 }
 
 func runTest(e *Env, args []string) error {
@@ -79,16 +78,14 @@ func runImage(e *Env, args []string) error {
 	fs := newFlags(e, "image build")
 	drv := driverFlag(fs)
 	orders := fs.Int("orders", 0, "override the seeded order count (for quick local builds)")
-	subnet := fs.String("subnet", "", "subnet for the builder instance (ec2 only)")
-	groups := fs.String("security-groups", "", "comma-separated security groups for the builder instance (ec2 only)")
+	out := fs.String("out", ".", "directory for the disk image (ec2 only)")
 	if err := fs.Parse(args[2:]); err != nil {
 		return err
 	}
 	name := firstNonEmpty(*drv, e.Getenv("OPSSCHOOL_DRIVER"))
 	kubevirt, ec2 := name == "kubevirt", name == "ec2"
 	if kubevirt || ec2 {
-		// Hosted mode's VMs boot the Lima base's disk; the EC2 build
-		// provisions its own and doesn't need a local driver.
+		// Hosted mode's VMs boot the Lima base's disk.
 		name = "lima"
 	}
 	m, err := vm.New(name)
@@ -111,16 +108,13 @@ func runImage(e *Env, args []string) error {
 	defer cancel()
 	switch {
 	case ec2:
-		if *subnet == "" || *groups == "" {
-			return errors.New("--driver ec2 needs --subnet and --security-groups for the builder instance")
-		}
-		ami, err := vm.BuildAMI(ctx, vm.BuildOptions{
-			Root: root, Image: image, Arch: "amd64", SeedOrders: *orders, Fingerprint: fp, Out: e.Stdout,
-		}, vm.AMIOptions{Subnet: *subnet, SecurityGroups: strings.Split(*groups, ",")})
+		file, err := vm.BuildEC2Disk(ctx, vm.BuildOptions{Root: root, Image: image, Fingerprint: fp, Out: e.Stdout}, *out)
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(e.Stdout, "built %s\n", ami)
+		fmt.Fprintf(e.Stdout, "wrote %s, a raw disk image ready to turn into an AMI.\n"+
+			"Tag the AMI %s=%s and %s=%s; see \"EC2 machines\" in docs/hosted.md.\n",
+			file, vm.EC2ImageTag, image, vm.EC2FingerprintTag, fp)
 		return nil
 	case kubevirt:
 		return vm.BuildVMDisk(ctx, vm.BuildOptions{Root: root, Image: image, Fingerprint: fp, Out: e.Stdout})
