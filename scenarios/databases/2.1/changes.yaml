@@ -1,0 +1,15 @@
+- id: shop#1199
+  title: Drop unused indexes on orders
+  author: tomas
+  team: Shop developers
+  before: 4h
+  status: Merged; migration applied in production
+  description: |
+    Cleanup from last week's index-usage report: these indexes had zero
+    reads, and every index slows down writes to orders. Saves about 400 MB.
+  diff: |
+    --- /dev/null
+    +++ b/migrations/${migration}_drop_unused_orders_index.sql
+    @@ -0,0 +1,2 @@
+    +-- Cleanup: indexes with zero reads in last week's index-usage report.
+    +ALTER TABLE orders DROP INDEX idx_orders_customer_created;

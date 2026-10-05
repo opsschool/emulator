@@ -1,0 +1,17 @@
+- id: PAY-301
+  title: "payments: switch to the new gateway endpoint"
+  author: Priya Patel
+  team: Payments team
+  before: 3h
+  status: Merged to main in shop-config; config-sync installs it within five minutes
+  description: |
+    The payments team is moving to the new gateway endpoint. This points
+    the shop at it.
+  diff: |
+    --- a/shop.env
+    +++ b/shop.env
+    @@ -16,3 +16,3 @@
+     SHOP_WORKER_BUFFER_MB=256
+    -SHOP_PAYMENTS_URL=http://payments.shop.internal:8081
+    +SHOP_PAYMENTS_URL=${bad_url}
+     SHOP_CLIENT_TIMEOUT=2s

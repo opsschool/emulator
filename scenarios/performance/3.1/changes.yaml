@@ -1,0 +1,30 @@
+- id: FIN-207
+  title: Cost allocation for application services
+  author: morgan
+  team: Finance engineering
+  before: 9h
+  status: Rolled out overnight
+  description: |
+    Groups the application services into one slice so their CPU can be
+    charged to the shop's budget, and caps it at what they really use.
+  diff: |
+    --- /dev/null
+    +++ b/systemd/${slice}.slice
+    @@ -0,0 +1,5 @@
+    +[Unit]
+    +Description=Application services (cost allocation, FIN-207)
+    +[Slice]
+    +# Sized from last month's average CPU use (2%) plus headroom (FIN-207).
+    +CPUQuota=${quota}%
+    --- /dev/null
+    +++ b/systemd/shop.service.d/50-cost-allocation.conf
+    @@ -0,0 +1,3 @@
+    +# Cost allocation (FIN-207): application services share one slice.
+    +[Service]
+    +Slice=${slice}.slice
+    --- /dev/null
+    +++ b/systemd/shop-worker.service.d/50-cost-allocation.conf
+    @@ -0,0 +1,3 @@
+    +# Cost allocation (FIN-207): application services share one slice.
+    +[Service]
+    +Slice=${slice}.slice

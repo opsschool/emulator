@@ -25,6 +25,7 @@ type Scenario struct {
 	Questions []Question // nil when the scenario has no quiz
 	Hints     []string
 	Dashboard []byte // nil when the scenario has no extra panels
+	Changes   []Change
 }
 
 // Path returns the path of a file inside the scenario directory.
@@ -76,6 +77,18 @@ func load(dir string) (*Scenario, []Problem) {
 	}
 	if b, err := os.ReadFile(filepath.Join(dir, FileDashboard)); err == nil {
 		s.Dashboard = b
+	}
+	if b, err := os.ReadFile(filepath.Join(dir, FileChanges)); err == nil {
+		cs, err := ParseChanges(b)
+		if err != nil {
+			add(FileChanges, "%s", err)
+		}
+		for _, c := range cs {
+			if bad := c.unknownVars(s.Spec.Randomize); len(bad) > 0 {
+				add(FileChanges, "%s refers to unknown variables: %s", c.ID, strings.Join(bad, ", "))
+			}
+		}
+		s.Changes = cs
 	}
 	return s, ps
 }

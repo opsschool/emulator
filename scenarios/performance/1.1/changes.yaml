@@ -1,0 +1,16 @@
+- id: MKT-118
+  title: Build the partner product feed every minute
+  author: ravi
+  team: Marketplace
+  before: 14h
+  status: Merged and deployed
+  description: |
+    Partners poll the feed every minute, so it must never fall behind.
+    Runs at raised priority so it's never late.
+  diff: |
+    --- /dev/null
+    +++ b/cron.d/${job}
+    @@ -0,0 +1,3 @@
+    +# Partner product feed. Partners poll it every minute, so it must never
+    +# fall behind (MKT-118).
+    +* * * * * root timeout 55 nice -n -10 /usr/local/bin/${job} >/dev/null 2>&1

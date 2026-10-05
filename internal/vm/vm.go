@@ -55,6 +55,13 @@ type Driver interface {
 	TelemetryNetwork() string
 }
 
+// Hosted is a driver for hosted mode, where the session runner reaches the
+// machine's services at its address on the cluster network.
+type Hosted interface {
+	Driver
+	Address(ctx context.Context) (string, error)
+}
+
 // New returns the named driver: "lima", "container", or "" to pick Lima
 // when limactl is installed and the container driver otherwise.
 func New(name string) (Driver, error) {
@@ -73,6 +80,10 @@ func New(name string) (Driver, error) {
 		return &Container{}, nil
 	case "kubernetes":
 		return KubeFromEnv()
+	case "kubevirt":
+		return KubeVirtFromEnv()
+	case "ec2":
+		return EC2FromEnv()
 	}
 	return nil, fmt.Errorf("unknown driver %q (lima or container)", name)
 }
@@ -118,7 +129,9 @@ func envScript(script string, env []string) string {
 func shellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
 
 // waitBooted polls until systemd reports the machine is up.
-func waitBooted(ctx context.Context, d Driver, timeout time.Duration) error {
+func waitBooted(ctx context.Context, d interface {
+	Run(context.Context, string, []string) (Result, error)
+}, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for {
 		res, err := d.Run(ctx, "systemctl is-system-running --wait >/dev/null 2>&1; systemctl is-active --quiet shop", nil)

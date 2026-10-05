@@ -1,0 +1,72 @@
+- id: CHG-3307
+  title: Raise the database connection pool to 40
+  author: sam
+  team: SRE
+  before: 8m
+  when: {setting: SHOP_DB_POOL_SIZE}
+  status: Applied; shop and worker restarted
+  description: |
+    Checkout waits for a free database connection at peak. 40 leaves
+    plenty of room under MySQL's max_connections.
+  diff: |
+    --- a/etc/shop/shop.env
+    +++ b/etc/shop/shop.env
+    @@ -9,3 +9,3 @@
+     SHOP_READ_FROM_REPLICA=false
+    -SHOP_DB_POOL_SIZE=20
+    +SHOP_DB_POOL_SIZE=4O
+     SHOP_DB_MAX_IDLE=10
+- id: CHG-3307
+  title: Cache catalog pages for two minutes
+  author: sam
+  team: SRE
+  before: 8m
+  when: {setting: SHOP_CACHE_TTL}
+  status: Applied; shop and worker restarted
+  description: |
+    Catalog pages change a few times a day, and the cache hit rate is
+    low at 60 seconds. Doubling it takes load off MySQL.
+  diff: |
+    --- a/etc/shop/shop.env
+    +++ b/etc/shop/shop.env
+    @@ -13,3 +13,3 @@
+     SHOP_REDIS_ADDR=127.0.0.1:6379
+    -SHOP_CACHE_TTL=60s
+    +SHOP_CACHE_TTL=120
+     SHOP_WORKER_CONCURRENCY=4
+- id: CHG-3307
+  title: Keep connections to the payments gateway open
+  author: sam
+  team: SRE
+  before: 8m
+  when: {setting: SHOP_CLIENT_KEEPALIVE}
+  status: Applied; shop and worker restarted
+  description: |
+    The payments team asked us to reuse connections instead of opening a
+    new one per order. Making sure keepalive is on.
+  diff: |
+    --- a/etc/shop/shop.env
+    +++ b/etc/shop/shop.env
+    @@ -18,3 +18,3 @@
+     SHOP_CLIENT_TIMEOUT=2s
+    -SHOP_CLIENT_KEEPALIVE=true
+    +SHOP_CLIENT_KEEPALIVE=ture
+     SHOP_RETRY_MAX=2
+- id: CHG-3307
+  title: Give slow reports more time before the query is cancelled
+  author: sam
+  team: SRE
+  before: 8m
+  when: {setting: SHOP_DB_QUERY_TIMEOUT}
+  status: Applied; shop and worker restarted
+  description: |
+    The monthly sales report hits the 5 second query timeout. Doubling
+    it until the report query is optimized.
+  diff: |
+    --- a/etc/shop/shop.env
+    +++ b/etc/shop/shop.env
+    @@ -11,3 +11,3 @@
+     SHOP_DB_MAX_IDLE=10
+    -SHOP_DB_QUERY_TIMEOUT=5s
+    +SHOP_DB_QUERY_TIMEOUT=10sec
+     SHOP_REDIS_ADDR=127.0.0.1:6379

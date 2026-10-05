@@ -1,0 +1,63 @@
+# Background changes for the Recent changes tab, shown in every scenario on
+# this image beside the scenario's own changes.yaml. They're real-looking
+# and harmless, so that a change in the list is never a pointer on its
+# own. `before` is how long before the session started. Not part of the
+# built image (vm.Fingerprint skips it).
+- id: shop#1174
+  title: "Order history: show 20 orders per page"
+  author: mina
+  team: Shop developers
+  before: 50h
+  status: Merged and deployed in release 2.3.1
+  description: |
+    Customers with a long history were getting one very long page. This
+    pages the list at 20 orders, newest first, with "Older orders" links.
+  diff: |
+    --- a/internal/api/orders.go
+    +++ b/internal/api/orders.go
+    @@ -88,7 +88,10 @@ func (h *Handler) orderHistory(w http.ResponseWriter, r *http.Request) {
+     	customer := customerID(r)
+    -	orders, err := h.store.Orders(ctx, customer)
+    +	page := pageParam(r)
+    +	orders, err := h.store.OrdersPage(ctx, customer, page, ordersPerPage)
+     	if err != nil {
+     		h.fail(w, r, err)
+     		return
+     	}
+- id: catalog#412
+  title: Add the honey-roasted range to the catalog
+  author: wally
+  team: Merchandising
+  before: 28h
+  status: Merged and published
+  description: |
+    Six new products for the autumn range. Photos follow separately.
+  diff: |
+    --- a/products/honey-roasted.csv
+    +++ b/products/honey-roasted.csv
+    @@ -0,0 +1,7 @@
+    +sku,name,price,weight_g
+    +HR-100,Honey-roasted peanuts,4.50,250
+    +HR-101,Honey-roasted peanuts (large),7.95,500
+    +HR-110,Honey-roasted cashews,6.75,200
+    +HR-120,Honey-roasted almonds,6.25,200
+    +HR-130,Honey-roasted mixed nuts,6.95,250
+    +HR-140,Honey and sea salt peanuts,4.75,250
+- id: dashboards#88
+  title: "Shop dashboard: add a panel for checkout latency"
+  author: sam
+  team: SRE
+  before: 20h
+  status: Merged
+  description: |
+    The overview only had overall latency. Checkout is the request we care
+    most about, so it gets its own p50/p99 panel.
+- id: runbooks#57
+  title: "On-call: how to find the shop's logs"
+  author: priya
+  team: SRE
+  before: 6h
+  status: Merged
+  description: |
+    New page for people joining the rota: where the shop, nginx and MySQL
+    log, and how to search them in Grafana.

@@ -19,6 +19,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	"github.com/opsschool/emulator/images"
 	"github.com/opsschool/emulator/internal/checks"
 	"github.com/opsschool/emulator/internal/edge"
 	"github.com/opsschool/emulator/internal/loadgen"
@@ -352,8 +353,13 @@ func (d *Daemon) handler() http.Handler {
 	// The session page. Its files and API answer only on the loopback
 	// address: ExtraListen is for Prometheus, and the page opens a root
 	// shell.
+	arch, err := images.Architecture(d.Scenario.Spec.Image)
+	if err != nil {
+		d.Log.Printf("architecture: %v", err)
+	}
 	mux.Handle("/", webui.Handler(webui.Config{
-		Shell: d.Machine.ShellCommand, PrometheusURL: telemetry.PrometheusURL(), Log: d.Log,
+		Shell: d.Machine.ShellCommand, PrometheusURL: telemetry.PrometheusURL(),
+		Architecture: arch, Changes: func() any { return d.changes() }, Log: d.Log,
 	}))
 	return guard(mux, d.Hosted.Token)
 }

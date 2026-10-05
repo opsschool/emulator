@@ -3,3 +3,7 @@
 bin
 docs
 images
+# Only what the learner is told about each image goes into the binary.
+!images/embed.go
+!images/*/architecture.yaml
+!images/*/changes.yaml

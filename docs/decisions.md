@@ -3,6 +3,85 @@
 Changes to [design.md](design.md) and judgment calls made while building.
 Newest first.
 
+## 2026-10-05: Hosted sessions get a real VM, with KubeVirt
+
+The project owner's intent for hosted mode is a shared alternative to the
+CLI: type a name, pick any scenario, get a VM and a terminal. A privileged
+container can't run seven of the scenarios (above), so by default the
+portal now gives each session a KubeVirt VirtualMachineInstance booted from
+the same disk as the Lima VM (`opsschool image build single-node --driver
+kubevirt` exports it as a containerDisk). `--machines=pods` keeps the
+container machines for clusters without KubeVirt, with the `needs_vm`
+scenarios left out as before.
+
+- The disk is a clone of the Lima base with Lima's own parts removed (its
+  guest agent, the builder's user, its netplan and sudoers files) and
+  cloud-init reset, so cloud-init runs again on KubeVirt. The clone happens
+  in `images/vm-export.sh`, outside `images/single-node/`, so it doesn't
+  change the image fingerprint.
+- cloud-init creates an `opsschool` user with the session's own SSH key,
+  and points `host.lima.internal` at the runner pod, where Alloy already
+  sends logs on the CLI. The runner reaches the VM over SSH on the pod
+  network; the VMI is owned by the runner pod, so it goes when the session
+  does, and the network policies for machines still apply because the
+  launcher pod carries the VMI's labels.
+- Reboots are real, as on the CLI. The runner waits for the boot ID to
+  change.
+- KubeVirt needs nodes with `/dev/kvm`. On EKS that means metal
+  instance types; ECS and Fargate can't run it. `--machines=ec2` covers
+  clusters without KVM (below).
+- On kind under WSL2 (AMD), KubeVirt's VMs crash a few seconds into boot
+  (`KVM: entry failed`, an invalid VMCB in the nested hypervisor), whatever
+  the CPU model. Lima's older QEMU boots the same disk there. Tested
+  locally with KubeVirt's software emulation instead: boot, cloud-init,
+  SSH, logs and the terminal work, but the shop is too slow under
+  emulation to run a scenario.
+
+## 2026-10-05: EC2 machines for hosted mode
+
+`--machines=ec2` gives each session an EC2 instance, for portals on
+clusters without KVM. The session runner still runs in the cluster and
+works the instance over SSH, as with KubeVirt, so the rest of hosted mode
+is unchanged.
+
+- `opsschool image build <image> --driver ec2` writes a raw disk image,
+  not an AMI. The project owner's call: building on an EC2 instance needs
+  a network path to it, which is hard to set up securely in a corporate
+  account, and how a disk becomes an AMI (coldsnap, VM Import, a pipeline)
+  differs between organizations. docs/hosted.md shows the coldsnap way.
+- The disk is the Lima VM's, exported as for KubeVirt, with two changes
+  for EC2: its initrd gets the NVMe and ENA drivers (it was built on a
+  virtio VM), and it boots with `net.ifnames=0`, because the image's
+  scripts expect the network card to be eth0 and on EC2 nothing renames it.
+- An instance whose runner dies would run, and cost money, forever. Each
+  one sets a timer at boot to power off half an hour after the portal's
+  `--max-age`, and powering off terminates it.
+- Not tested against AWS: no credentials were available. The request
+  building and AMI lookup have unit tests, and the disk was booted locally
+  in QEMU on an NVMe drive.
+
+## 2026-10-05: Architecture and Recent changes tabs
+
+Learners started every scenario knowing nothing about the system, and an
+SRE's first stop is usually the last deploy. The session page has two more
+tabs:
+
+- Architecture, from `images/<image>/architecture.yaml`: the components,
+  where each runs, its unit, ports, config and logs, and what it calls. It
+  describes the healthy system and is the same for every scenario.
+- Recent changes, the pull requests and change tickets that went out
+  before the page. `images/<image>/changes.yaml` holds background changes,
+  shown in every scenario and dated from the session start, so the list
+  is never a pointer on its own. A scenario's own `changes.yaml` is added
+  once the scenario begins, dated from the break. Changes use `${var}` for
+  randomized values and `when` for variants. They are written the way their
+  authors would have written them: innocent, sometimes wrong about their
+  own effect.
+- Not every scenario has a change. linux/1.1 (someone edited a file by
+  hand) has none on purpose: the change you need isn't always recorded.
+- Neither file goes into the machine, so the image fingerprint skips both.
+  They are embedded in the opsschool binary.
+
 ## 2026-10-05: Scenarios that need a VM
 
 A sweep of every scenario under `--driver container` showed seven that can't
