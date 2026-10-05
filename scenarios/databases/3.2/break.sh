@@ -21,14 +21,23 @@ for _ in $(seq 60); do
   curl -fsS -o /dev/null http://127.0.0.1:8080/health && break
   sleep 1
 done
-# The worker reconciles as it starts; wait for its transaction.
-for _ in $(seq 30); do
-  n=$(mysql -N -B -e "SELECT COUNT(*) FROM information_schema.innodb_trx t
+# The worker reconciles as it starts and then once a minute; wait for its
+# transaction: idle for a few seconds, so not one of the shop's own
+# between statements. Allow a few minutes in case the first try fails.
+# Without it the migration would apply at once and nothing would hang.
+idle=0
+for _ in $(seq 150); do
+  idle=$(mysql -N -B -e "SELECT COUNT(*) FROM information_schema.innodb_trx t
     JOIN information_schema.processlist p ON p.id = t.trx_mysql_thread_id
-    WHERE p.user = 'shop' AND p.command = 'Sleep'")
-  ((n > 0)) && break
+    WHERE p.user = 'shop' AND p.command = 'Sleep'
+      AND t.trx_started < NOW() - INTERVAL 3 SECOND")
+  ((idle > 0)) && break
   sleep 1
 done
+if ((idle == 0)); then
+  echo "the worker never left a transaction open" >&2
+  exit 1
+fi
 
 name="${OPSSCHOOL_VAR_MIGRATION}_orders_add_gift_note"
 dir=/opt/shop/migrations

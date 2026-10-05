@@ -3,6 +3,26 @@
 Changes to [design.md](design.md) and judgment calls made while building.
 Newest first.
 
+## 2026-10-05: linux/1.1 checks free space now, not the trend
+
+The fixed check `predict_linear(avail[10m], 3600) > 0` failed for about ten
+minutes after a correct fix. The break fills /data in seconds, so the
+10-minute window held a cliff to zero and the fitted line pointed down.
+It also didn't catch what it was for: by estimate, debug logging at normal traffic adds
+tens of MB an hour to a 6 GB volume, so the forecast stayed positive with
+debug still on (the log level check covers that). The check is now "at
+least 20% of /data is free"; a healthy machine has about 80% free.
+
+## 2026-10-05: The shop's MySQL sessions use UTC
+
+The shop writes times in UTC but compared them with `NOW()`, which follows
+the server's time zone. Lima VMs take the host's zone, so on a host east
+of UTC every order in flight looked older than five minutes: the worker
+warned about stuck orders all the time, and in databases/3.2 the 2.4.0
+worker always found "stuck" orders, committed, and never held the lock,
+so the scenario didn't break. Containers run in UTC, which hid it. The
+shop now sets `time_zone='+00:00'` on its connections.
+
 ## 2026-10-05: Hosted sessions get a real VM, with KubeVirt
 
 The project owner's intent for hosted mode is a shared alternative to the

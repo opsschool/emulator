@@ -197,7 +197,7 @@ fixed:
   - type: script
     run: checks/log_level_ok.sh     # exit 0 = pass
   - type: promql
-    expr: predict_linear(node_filesystem_avail_bytes{mountpoint="/data"}[10m], 3600) > 0
+    expr: node_filesystem_avail_bytes{mountpoint="/data"} / node_filesystem_size_bytes{mountpoint="/data"} > 0.2
 ```
 
 Check types:
