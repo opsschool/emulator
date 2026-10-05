@@ -13,14 +13,19 @@
 # more than the gateway can do even at normal traffic. The overload sustains itself after the peak ends.
 set -euo pipefail
 
-dropin=/etc/systemd/system/shop-payments.service.d/concurrency.conf
-mkdir -p "$(dirname "$dropin")"
-cat >"$dropin" <<'UNIT'
+# On a VM the gateway runs in its own network namespace (netns.conf) and
+# listens on every address there; the container driver keeps it on
+# loopback. This drop-in sorts after netns.conf, so its ExecStart wins.
+dropins=/etc/systemd/system/shop-payments.service.d
+listen=127.0.0.1:8081
+[[ -e $dropins/netns.conf ]] && listen=0.0.0.0:8081
+mkdir -p "$dropins"
+cat >"$dropins/per-merchant-limit.conf" <<UNIT
 # PAY-298: the card network allows two authorizations in flight per
 # merchant. Match it here so we find out before they reject us.
 [Service]
 ExecStart=
-ExecStart=/opt/shop/current/shop payments --listen 127.0.0.1:8081 --workers 2 --min-latency 100ms --max-latency 180ms
+ExecStart=/opt/shop/current/shop payments --listen $listen --workers 2 --min-latency 100ms --max-latency 180ms
 UNIT
 systemctl daemon-reload
 systemctl restart shop-payments.service
