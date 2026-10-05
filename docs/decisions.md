@@ -5,7 +5,7 @@ Newest first.
 
 ## 2026-10-05: Scenarios that need a VM
 
-A sweep of every scenario under `--driver container` showed six that can't
+A sweep of every scenario under `--driver container` showed seven that can't
 work on the container image, and so not in hosted mode either:
 
 | Scenario | Why |
@@ -16,13 +16,14 @@ work on the container image, and so not in hosted mode either:
 | networking/3.1 | Sets `nf_conntrack_max`, which is read-only outside the host's network namespace. |
 | networking/3.2 | Needs the service segment (a bridge and a payments namespace), which the image leaves out. |
 | performance/2.1 | Runs the machine out of memory. In a container that's the host's memory and swap. |
+| services/4.1 | Fills the root disk, like linux/3.1. |
 
 Rather than fake these in a container, `scenario.yaml` takes a `needs_vm`
 reason. `opsschool test` skips the scenario under the container driver
 (so the Scenarios CI loop still covers everything else), `opsschool start`
 refuses it, and `opsschool serve` leaves it off the portal and logs why.
 The start error doesn't repeat the reason, because it names the cause.
-Hosted mode offers the other twelve; a Kata runtime class would give each
+Hosted mode offers the other eleven; a Kata runtime class would give each
 machine its own kernel and could lift some of these later.
 
 ## 2026-10-05: Hosted mode on Kubernetes

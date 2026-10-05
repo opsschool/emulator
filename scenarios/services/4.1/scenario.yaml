@@ -19,3 +19,5 @@ fix_verification:
 mitigate_hold: 120s
 time_limit: 60m
 target_time: 35m
+# Hosted mode and --driver container skip this scenario.
+needs_vm: it fills the root disk, which in a container is the host's disk
