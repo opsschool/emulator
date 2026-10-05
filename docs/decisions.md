@@ -3,6 +3,34 @@
 Changes to [design.md](design.md) and judgment calls made while building.
 Newest first.
 
+## 2026-10-05: Advanced scenarios: a payments gateway with a worker limit
+
+Two new scenarios for review: databases/3.2 (a metadata lock pileup behind
+a long transaction) and services/4.2 (a retry storm that doesn't recover
+after a traffic peak). Both run under `--driver container`, so hosted mode
+offers them.
+
+services/4.2 needs the payments service to behave like a real card
+gateway: a fixed number of workers, a realistic per-call latency, and no
+cancellation, so it keeps working on calls the shop has given up on.
+`shop payments` takes `--workers`, `--min-latency` and `--max-latency`.
+The defaults (no limit, 2-8ms) keep every other scenario as it was.
+Every 10 seconds it logs a warning with the number of calls waiting for a
+worker, which is the clue the learner needs.
+
+The storm only takes hold above the gateway's capacity, so the scenario
+uses the `peak` load profile, and the break turns off the shop's retry
+backoff. With exponential backoff the shop's five-second order deadline
+already caps attempts at about five, and the system recovered. Raising
+the gateway's worker limit is the mitigation: with spare workers nothing
+times out, so there are no retries. The fixed checks therefore require
+the original limit as well as about one payments call per order, so only
+a change to the shop's timeout and retries counts as a fix.
+
+databases/3.2's pileup filled `max_connections`, so mitigate.sh (and a
+learner) got "Too many connections". Its break caps the shop's account at
+120 connections first.
+
 ## 2026-10-05: Scenarios that need a VM
 
 A sweep of every scenario under `--driver container` showed seven that can't

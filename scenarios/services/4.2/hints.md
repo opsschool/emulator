@@ -1,0 +1,1 @@
+Compare how often the shop calls the payments gateway with how many orders it gets: `shop_payment_requests_total` and `http_requests_total{route="POST /orders"}` in Prometheus. The gateway logs its queue in /data/log/shop/app.log. Then look at what each of this morning's changes did, and at what happens to a request the shop has given up on.
