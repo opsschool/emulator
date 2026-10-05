@@ -95,6 +95,8 @@ internal/vm/            VM driver interface + Lima implementation
 internal/checks/        check engine: promql, http, script
 internal/results/       results store and scoring
 internal/telemetry/     compose lifecycle, dashboard assembly
+internal/hosted/        the Kubernetes portal and session runner
+deploy/                 the opsschool container image and Kubernetes manifests
 internal/loadgen/       load generator
 demoapp/                the Go demo service ("shop")
 images/single-node/     Lima template + provisioning for the single-node image
@@ -127,6 +129,8 @@ CONTRIBUTING.md
 While a session runs, the daemon also serves a session page at `http://127.0.0.1:19999/` with the same actions: the incident, progress, hints, Verify and End session, a terminal on the scenario machine, and the key dashboard charts. See the decision "A session page in the browser".
 
 Only one scenario runs at a time in the MVP.
+
+`opsschool serve` runs the same sessions for a group from a Kubernetes cluster, with a portal page to start them and a shared scoreboard. See [hosted.md](hosted.md).
 
 The `mitigated` tier is evaluated continuously in the background while a scenario runs. `fixed` is evaluated only on `verify`, because fix verification is disruptive.
 
@@ -177,6 +181,7 @@ Rules:
 - `randomize` values are chosen once per session from a seed and passed to every script as environment variables named `OPSSCHOOL_VAR_<NAME>` (uppercased).
 - The session seed, username and scenario ID are passed as `OPSSCHOOL_SEED`, `OPSSCHOOL_USER` and `OPSSCHOOL_SCENARIO`.
 - A scenario's ID is `<category>/<level>.<n>`, from its directory, for example `linux/1.1` or `databases/2.3`. The level (1 to 4) comes from the directory, not from scenario.yaml; `n` numbers the scenarios at that level from 1, and a new scenario takes the next free number. The ID says nothing else about the scenario, and scenarios have no title.
+- `needs_vm`, optional, says why a scenario can't run on the container image, for example because it changes a kernel setting that a container can only read. `opsschool test --driver container` skips such a scenario, `opsschool start` refuses it without saying why, and hosted mode doesn't offer it.
 - `alerts` and `summary` are the only text shown to the learner at start. Each alert is one line, printed as `[FIRING] <line>`, like a page from the alerting system; leave it out when nothing would fire and the incident arrives as a report. The `summary` is what people are reporting. Both describe symptoms, never the cause.
 
 ### checks.yaml
@@ -440,7 +445,7 @@ Multi-node image, the distributed category, and all L3–L4 scenarios.
 
 ### Later phases (not in scope now)
 
-- Hosted mode: Firecracker microVMs, browser terminal, accounts, hosted scoreboard.
+- Hosted mode: built as a Kubernetes portal with a shared scoreboard; see [hosted.md](hosted.md) and the decision "Hosted mode on Kubernetes". Accounts are left to a sign-in proxy.
 - Kubernetes and cloud scenarios.
 - A software-engineer track framed around "your service is paging," with the app code in scope.
 

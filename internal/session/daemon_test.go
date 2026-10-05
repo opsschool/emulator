@@ -224,3 +224,23 @@ func TestVerifyKeepsMitigatedHold(t *testing.T) {
 		t.Errorf("fixed passed at %s, want %s", got, now)
 	}
 }
+
+func TestGuardAdmitsTheHostedToken(t *testing.T) {
+	h := guard(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}), "tok")
+	for _, c := range []struct {
+		token string
+		want  int
+	}{{"", http.StatusForbidden}, {"nope", http.StatusForbidden}, {"tok", http.StatusOK}} {
+		r := httptest.NewRequest(http.MethodPost, "/stop", nil)
+		r.Host = "opsschool.example.com"
+		r.Header.Set("Origin", "https://opsschool.example.com")
+		if c.token != "" {
+			r.Header.Set(TokenHeader, c.token)
+		}
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != c.want {
+			t.Errorf("token %q: %d, want %d", c.token, w.Code, c.want)
+		}
+	}
+}

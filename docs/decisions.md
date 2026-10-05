@@ -3,6 +3,111 @@
 Changes to [design.md](design.md) and judgment calls made while building.
 Newest first.
 
+## 2026-10-05: Scenarios that need a VM
+
+A sweep of every scenario under `--driver container` showed seven that can't
+work on the container image, and so not in hosted mode either:
+
+| Scenario | Why |
+| --- | --- |
+| databases/3.1 | Loads an AppArmor profile. The image has no `apparmor_parser`, and profiles belong to the host. |
+| linux/3.1 | Fills the root disk. In a container that's the host's disk, or on Kubernetes the node's. |
+| networking/1.1 | Breaks the site resolver. Docker and the kubelet own `resolv.conf`, so the image has none. |
+| networking/3.1 | Sets `nf_conntrack_max`, which is read-only outside the host's network namespace. |
+| networking/3.2 | Needs the service segment (a bridge and a payments namespace), which the image leaves out. |
+| performance/2.1 | Runs the machine out of memory. In a container that's the host's memory and swap. |
+| services/4.1 | Fills the root disk, like linux/3.1. |
+
+Rather than fake these in a container, `scenario.yaml` takes a `needs_vm`
+reason. `opsschool test` skips the scenario under the container driver
+(so the Scenarios CI loop still covers everything else), `opsschool start`
+refuses it, and `opsschool serve` leaves it off the portal and logs why.
+The start error doesn't repeat the reason, because it names the cause.
+Hosted mode offers the other eleven; a Kata runtime class would give each
+machine its own kernel and could lift some of these later.
+
+## 2026-10-05: Hosted mode on Kubernetes
+
+Most organisations will run Ops School as a web page with a shared
+scoreboard, not as a CLI on each laptop. `opsschool serve` is that page
+(the portal), and both it and the CLI are supported. See
+[hosted.md](hosted.md) for running it. The design.md "Later phases" entry
+imagined Firecracker microVMs and accounts; this is smaller:
+
+- **One session is two pods.** The runner pod runs `opsschool _runner`,
+  which plays `start` and then the session daemon, with Prometheus, Loki
+  and Grafana as native sidecars on its loopback. The runner creates the
+  machine pod (owned by the runner pod, so deleting one deletes both) and
+  forwards the VM's usual ports (18080, 191xx) to it, as Lima does on a
+  laptop. Checks, load and telemetry then run unchanged. One pod with the
+  machine in it would be simpler, but a privileged container next to the
+  telemetry and the session token would let the learner read or change
+  their own grading. Learners are trusted, but there's no need to tempt
+  them.
+- **The machine is the container driver's image.** A real VM per session
+  (KubeVirt, Firecracker) needs nested virtualization or bare metal, which
+  most clusters don't have. Operators who want a kernel boundary can use
+  a Kata runtime class (`--runtime-class`).
+- **Reboots are soft reboots.** A pod's container that restarts loses its
+  writable layer, so the reboot during verify would undo the learner's
+  fix. `systemctl soft-reboot` restarts userspace and keeps the files,
+  and `reboot.target` is linked to `soft-reboot.target` so typing `reboot`
+  does the same. The kubelet bind-mounts `/etc/hosts`, `/etc/hostname` and
+  `/etc/resolv.conf`; a soft reboot unmounts them like any file system and
+  leaves the image's empty files, so their mount units get
+  `DefaultDependencies=no`. Found when networking/2.1's verify failed
+  every order after the reboot.
+- **The portal proxies everything.** Browsers only reach the portal, which
+  proxies `/s/<id>/` to the session's daemon and Grafana with the session's
+  token. The daemon admits the token in place of its loopback-only check.
+  The session page's URLs are all relative, so the same page works under
+  `/s/<id>/` and on the CLI's 127.0.0.1:19999.
+- **Identity** is a header set by a sign-in proxy (`--user-header`), or a
+  name the learner types, kept in a cookie. Nothing checks the typed name;
+  learners are trusted.
+- **Results** go to a JSONL file on a volume, in the CLI's format, so the
+  portal is one replica with the Recreate strategy. A database would allow
+  more replicas, but one portal serves far more people than one cluster
+  has sessions for.
+- **One session per person**, and `--max-sessions` overall. A session ends
+  itself ten minutes after its time limit, and the portal deletes any
+  session older than `--max-age` in case a runner never ends.
+- **Errors stay out of the learner's view.** When a runner fails, it
+  writes the reason to its termination message. The portal logs it, and
+  the learner sees only that something went wrong: the reason can name
+  the fault, such as a break script's failing command.
+- **No image fingerprint check.** The machine image comes from the
+  registry, built with the same commit as the opsschool image by whoever
+  deploys it; there's no checkout to compare against.
+- **The quiz is CLI-only** for now. The session page has never had it.
+
+## 2026-10-05: Container driver fixes for Docker Desktop
+
+Tonight was the first time the container driver ran under Docker Desktop
+on WSL2, and three things broke:
+
+- systemd couldn't create its cgroups with `--cgroupns=host` ("Failed to
+  create /docker/<id>/init.scope control group"). On cgroup v2 the driver
+  now gives the machine a private cgroup namespace and no bind mount of
+  `/sys/fs/cgroup`, as kind does.
+- The CLI served its metrics on the Docker network's gateway address, which
+  under Docker Desktop is inside Desktop's VM, so the listen failed. Under
+  Docker Desktop the stack scrapes `host.docker.internal` instead, which
+  reaches the CLI's loopback.
+- `docker cp` can't write into tmpfs mounts, and the machine's `/run` is
+  one, so copying checks to `/run/opsschool` failed. Copies now stream a
+  tar through `docker exec`, as the Kubernetes driver does.
+
+The Scenarios workflow only runs on pull requests, and recent changes were
+merged without one, so it hadn't caught the last of these.
+
+## 2026-10-05: Disk charts leave out bind-mounted files
+
+Containers have `/etc/hostname`, `/etc/hosts` and `/etc/resolv.conf` bind
+mounted from the host, and node_exporter reports each as a filesystem. The
+disk charts and dashboard leave out mount points under `/etc/`. No real
+data volume is mounted there.
+
 ## 2026-10-04: Sessions refuse an out-of-date image
 
 A base image is built once, but it bakes in `images/<image>/` and the shop

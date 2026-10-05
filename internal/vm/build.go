@@ -113,6 +113,9 @@ func BuildContainerBase(ctx context.Context, o BuildOptions) error {
 	}
 	if err := step("provisioning (several minutes)", "docker", "exec", "-e", "OPSSCHOOL_PROVISION=container", builder,
 		"bash", "/opt/opsschool-build/provision.sh", "/opt/opsschool-build"); err != nil {
+		// The builder is deleted on return, so show the failed units' logs.
+		step("logs of failed units", "docker", "exec", builder, "bash", "-c",
+			"for u in $(systemctl --failed --no-legend --plain | awk '{print $1}'); do journalctl -u \"$u\" --no-pager -n 40; done")
 		return err
 	}
 	if err := step("smoke test", "docker", "exec", builder, "bash", "/opt/opsschool-build/smoke.sh"); err != nil {

@@ -25,6 +25,10 @@ type Env struct {
 	// image. Bring refuses a base image built from different files. Empty
 	// skips the check.
 	Fingerprint string
+	// ExternalTelemetry means Prometheus, Loki and Grafana are already
+	// running at their usual addresses, as sidecars in hosted mode, with
+	// configuration from RenderTelemetry. Bring waits for them.
+	ExternalTelemetry bool
 }
 
 // NewSeed returns a random session seed.
@@ -38,11 +42,11 @@ func NewSeed() uint64 {
 func (e *Env) Stack(ctx context.Context) (*telemetry.Stack, error) {
 	s := telemetry.NewStack(filepath.Join(Dir(e.Home), "telemetry"))
 	if n := e.Machine.TelemetryNetwork(); n != "" {
-		gw, err := vm.NetworkGateway(ctx)
+		host, err := vm.HostOnNetwork(ctx)
 		if err != nil {
 			return nil, err
 		}
-		s.UseNetwork(n, gw)
+		s.UseNetwork(n, host)
 	}
 	return s, nil
 }
@@ -99,6 +103,17 @@ func (e *Env) Bring(ctx context.Context, s *scenario.Scenario) error {
 	if exists, _ := e.Machine.Exists(ctx); exists {
 		return fmt.Errorf("a scenario machine already exists; run `opsschool stop` first")
 	}
+	if e.ExternalTelemetry {
+		e.Say("Booting the scenario machine. This usually takes about a minute.")
+		if err := e.Machine.Create(ctx, s.Spec.Image); err != nil {
+			return err
+		}
+		if _, err := e.Machine.Run(ctx, settleScript, nil); err != nil {
+			return err
+		}
+		e.Say("Waiting for telemetry (Prometheus, Loki, Grafana)")
+		return telemetry.WaitReady(ctx)
+	}
 	stack, err := e.Stack(ctx)
 	if err != nil {
 		return err
@@ -139,6 +154,18 @@ for _ in $(seq 18); do
   total=$(( (u2+n2+s2+i2+w2+q2+sq2+st2) - (u+n+s+i+w+q+sq+st) ))
   if (( total > 0 && (i2 - i) * 100 / total >= 80 )); then exit 0; fi
 done`
+
+// RenderTelemetry writes the telemetry configuration and the scenario's
+// dashboard for a stack that runs beside the machine driver's host, as
+// hosted mode's sidecars do: everything on 127.0.0.1.
+func RenderTelemetry(dir string, s *scenario.Scenario) error {
+	dash, err := telemetry.Dashboard(s.Spec.ID, s.Dashboard)
+	if err != nil {
+		return err
+	}
+	st := &telemetry.Stack{Dir: dir, HostNetwork: true}
+	return st.Render(dash)
+}
 
 // Baseline is how long a session runs healthy, with load and telemetry,
 // before the break: the dashboards show normal behavior to compare against.
@@ -184,6 +211,9 @@ func (e *Env) Teardown(ctx context.Context) error {
 	if exists, _ := e.Machine.Exists(ctx); exists {
 		e.Say("Deleting the scenario machine")
 		keep(e.Machine.Delete(ctx))
+	}
+	if e.ExternalTelemetry {
+		return first
 	}
 	e.Say("Stopping telemetry")
 	if stack, err := e.Stack(ctx); err == nil {

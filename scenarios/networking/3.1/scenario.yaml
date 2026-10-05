@@ -25,3 +25,5 @@ load:
 mitigate_hold: 90s
 time_limit: 45m
 target_time: 25m
+# Hosted mode and --driver container skip this scenario.
+needs_vm: it sets nf_conntrack_max, which a container can only read

@@ -64,7 +64,8 @@ type Stack struct {
 	HostNetwork bool
 	// Network, when set, is an existing Docker network the stack joins to
 	// reach the machine directly (the container driver). CLIHost is the
-	// host's address on that network, where the CLI serves its metrics.
+	// host's address on that network, where the CLI serves its metrics, or
+	// "" to use host.docker.internal (Docker Desktop).
 	Network string
 	CLIHost string
 }
@@ -144,7 +145,7 @@ func (s *Stack) data() renderData {
 		d.PrometheusURL = "http://prometheus:9090"
 		d.LokiURL = fmt.Sprintf("http://loki:%d", LokiPort)
 	}
-	if s.Network != "" {
+	if s.Network != "" && s.CLIHost != "" {
 		cli = s.CLIHost
 	}
 	for _, t := range Targets {
@@ -215,6 +216,11 @@ func (s *Stack) Up(ctx context.Context) error {
 	if err := s.compose(ctx, "up", "-d", "--remove-orphans"); err != nil {
 		return err
 	}
+	return WaitReady(ctx)
+}
+
+// WaitReady waits until Prometheus, Loki and Grafana answer.
+func WaitReady(ctx context.Context) error {
 	for _, u := range []string{
 		PrometheusURL() + "/-/ready",
 		fmt.Sprintf("http://127.0.0.1:%d/ready", LokiPort),

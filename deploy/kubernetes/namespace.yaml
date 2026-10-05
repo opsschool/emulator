@@ -1,0 +1,9 @@
+# Scenario machines are privileged pods (systemd, iptables, mounts), so the
+# namespace allows them. Keep anything else out of it.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: opsschool
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/warn: privileged

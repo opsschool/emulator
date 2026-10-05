@@ -17,3 +17,5 @@ fix_verification:
 mitigate_hold: 60s
 time_limit: 45m
 target_time: 25m
+# Hosted mode and --driver container skip this scenario.
+needs_vm: it runs the machine out of memory, which in a container is the host's memory

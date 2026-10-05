@@ -55,6 +55,24 @@ func TestValidateBroken(t *testing.T) {
 	}
 }
 
+func TestNeedsVM(t *testing.T) {
+	// linux/3.1 fills the root disk, so it never runs in a container.
+	e, out, errb := testEnv(t)
+	if code := Run(e, []string{"test", "../../scenarios/linux/3.1", "--driver", "container"}); code != 0 {
+		t.Fatalf("test: exit %d\n%s%s", code, out, errb)
+	}
+	if !strings.Contains(out.String(), "linux/3.1: skipped") {
+		t.Errorf("test didn't say it skipped:\n%s", out)
+	}
+	e, out, errb = testEnv(t)
+	if code := Run(e, []string{"start", "linux/3.1", "--user", "sam", "--driver", "container"}); code == 0 {
+		t.Fatalf("start: exit 0\n%s", out)
+	}
+	if msg := errb.String(); !strings.Contains(msg, "--driver lima") || strings.Contains(msg, "disk") {
+		t.Errorf("start error should ask for a VM without saying why: %s", msg)
+	}
+}
+
 func TestList(t *testing.T) {
 	e, out, errb := testEnv(t)
 	store := results.Open(e.Getenv("OPSSCHOOL_HOME"))

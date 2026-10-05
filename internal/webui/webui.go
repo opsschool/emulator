@@ -27,15 +27,21 @@ type Config struct {
 
 // Handler serves the page, its files, the terminal and the charts.
 func Handler(c Config) http.Handler {
+	mux := http.NewServeMux()
+	mux.Handle("GET /", Static())
+	mux.HandleFunc("GET /api/terminal", c.terminal)
+	mux.HandleFunc("GET /api/charts", c.charts)
+	return mux
+}
+
+// Static serves the page and its files, without the session API. The
+// hosted portal serves them itself while a session starts.
+func Static() http.Handler {
 	files, err := fs.Sub(static, "static")
 	if err != nil {
 		panic(err)
 	}
-	mux := http.NewServeMux()
-	mux.Handle("GET /", http.FileServerFS(files))
-	mux.HandleFunc("GET /api/terminal", c.terminal)
-	mux.HandleFunc("GET /api/charts", c.charts)
-	return mux
+	return http.FileServerFS(files)
 }
 
 // LocalOnly rejects requests that a browser sent from another site, and

@@ -85,6 +85,10 @@ func runStart(e *Env, args []string) error {
 	if err != nil {
 		return err
 	}
+	if m.Name() != "lima" && s.Spec.NeedsVM != "" {
+		// Not the reason: it would give the scenario away.
+		return fmt.Errorf("%s needs a virtual machine; start it with --driver lima", s.Spec.ID)
+	}
 	if *seed == 0 {
 		*seed = session.NewSeed()
 	}
@@ -339,11 +343,13 @@ func runDaemon(e *Env, args []string) error {
 	ctx, cancel := signalContext()
 	defer cancel()
 	if m.TelemetryNetwork() != "" {
-		gw, err := vm.NetworkGateway(ctx)
+		host, err := vm.HostOnNetwork(ctx)
 		if err != nil {
 			return err
 		}
-		d.ExtraListen = fmt.Sprintf("%s:%d", gw, telemetry.CLIMetricsPort)
+		if host != "" {
+			d.ExtraListen = fmt.Sprintf("%s:%d", host, telemetry.CLIMetricsPort)
+		}
 	}
 	return d.Run(ctx)
 }

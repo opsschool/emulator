@@ -1,0 +1,57 @@
+# The portal creates a session runner pod per session and deletes ended
+# ones. Each runner creates its scenario machine pod and runs commands in
+# it with kubectl exec. Nothing here reaches outside the namespace.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: opsschool-portal
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: opsschool-portal
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [create, get, list, watch, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: opsschool-portal
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: opsschool-portal
+subjects:
+  - kind: ServiceAccount
+    name: opsschool-portal
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: opsschool-session
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: opsschool-session
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [create, get, list, delete]
+  - apiGroups: [""]
+    resources: [pods/exec]
+    verbs: [create, get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: opsschool-session
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: opsschool-session
+subjects:
+  - kind: ServiceAccount
+    name: opsschool-session

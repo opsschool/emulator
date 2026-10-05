@@ -29,8 +29,9 @@ type chart struct {
 }
 
 // Real filesystems only: the scenario machine also has tmpfs and overlay
-// mounts that would crowd the chart.
-const realFS = `fstype!~"tmpfs|devtmpfs|overlay|squashfs|ramfs|nsfs|autofs"`
+// mounts that would crowd the chart, and in a container the files Docker or
+// Kubernetes mounts into /etc.
+const realFS = `fstype!~"tmpfs|devtmpfs|overlay|squashfs|ramfs|nsfs|autofs",mountpoint!~"/etc/.+"`
 
 var charts = []chart{
 	{

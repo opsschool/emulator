@@ -1,0 +1,7 @@
+# kubectl apply -k deploy/kubernetes
+namespace: opsschool
+resources:
+  - namespace.yaml
+  - rbac.yaml
+  - portal.yaml
+  - networkpolicy.yaml

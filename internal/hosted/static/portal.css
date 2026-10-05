@@ -1,0 +1,53 @@
+/* The portal's own layout. Colors, fonts, buttons and the header come
+   from the session page's app.css. */
+main.portal {
+  display: flex; flex-direction: column; flex-wrap: nowrap; gap: 20px;
+  width: 100%; max-width: 1080px; margin: 0 auto; padding: 24px 16px 48px;
+}
+h1 { margin: 0 0 8px; font-size: 26px; }
+.intro p { max-width: 68ch; margin-bottom: 8px; }
+.panel {
+  padding: 20px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 12px;
+}
+.panel.current { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; border-color: var(--accent); }
+#scoreboard-view:not([hidden]) { display: flex; flex-direction: column; gap: 20px; }
+.bad { color: var(--bad); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+input {
+  font: inherit; min-height: 44px; padding: 0 12px; border-radius: 10px; flex: 1 1 260px;
+  border: 1px solid var(--border); background: var(--bg); color: var(--text);
+}
+input:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+
+.category { margin-top: 8px; }
+.category h2 { margin: 0 0 10px; text-transform: capitalize; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.scenario {
+  padding: 16px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.scenario .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.scenario .id { font-family: var(--mono); font-weight: 700; font-size: 17px; }
+.level { white-space: nowrap; font-size: 13px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--surface2); color: var(--muted); }
+.scenario dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; font-size: 14px; }
+.scenario dt { color: var(--muted); }
+.scenario dd { margin: 0; font-variant-numeric: tabular-nums; }
+.scenario .btn { margin-top: auto; align-self: flex-start; }
+.done { color: var(--ok); font-weight: 700; }
+
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; font-size: 14px; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr.me td { background: var(--ok-bg); }
+td .mono { font-family: var(--mono); }
+
+@media (max-width: 640px) {
+  .bar { padding: 10px 16px; }
+  #who { display: none; }
+  main.portal { padding: 16px 16px 32px; }
+  h1 { font-size: 22px; }
+}

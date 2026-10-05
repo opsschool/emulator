@@ -1,0 +1,85 @@
+# The portal. One replica: it keeps results in a file on its volume.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: opsschool-results
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opsschool
+  labels:
+    app.kubernetes.io/name: opsschool
+    app.kubernetes.io/component: portal
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: opsschool
+      app.kubernetes.io/component: portal
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: opsschool
+        app.kubernetes.io/component: portal
+    spec:
+      serviceAccountName: opsschool-portal
+      securityContext:
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+      containers:
+        - name: portal
+          # Use the same image in OPSSCHOOL_IMAGE: session runners run it.
+          image: opsschool/opsschool:dev
+          args:
+            - opsschool
+            - serve
+            - --machine-image=opsschool/{image}:base
+            # With a sign-in proxy in front, name the header it sets:
+            # - --user-header=X-Forwarded-Email
+            # Isolate machines in their own kernel, if the cluster has Kata:
+            # - --runtime-class=kata
+          env:
+            - name: OPSSCHOOL_IMAGE
+              value: opsschool/opsschool:dev
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          volumeMounts:
+            - name: results
+              mountPath: /var/lib/opsschool
+      volumes:
+        - name: results
+          persistentVolumeClaim:
+            claimName: opsschool-results
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opsschool
+  labels:
+    app.kubernetes.io/name: opsschool
+spec:
+  selector:
+    app.kubernetes.io/name: opsschool
+    app.kubernetes.io/component: portal
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

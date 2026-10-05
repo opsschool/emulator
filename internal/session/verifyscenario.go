@@ -174,11 +174,13 @@ func allPass(ss []TestStep) bool {
 func serveEdge(ctx context.Context, m vm.Driver, ed *edge.Edge) (func(), error) {
 	addrs := []string{ControlAddr}
 	if m.TelemetryNetwork() != "" {
-		gw, err := vm.NetworkGateway(ctx)
+		host, err := vm.HostOnNetwork(ctx)
 		if err != nil {
 			return nil, err
 		}
-		addrs = append(addrs, fmt.Sprintf("%s:%d", gw, telemetry.CLIMetricsPort))
+		if host != "" {
+			addrs = append(addrs, fmt.Sprintf("%s:%d", host, telemetry.CLIMetricsPort))
+		}
 	}
 	mux := http.NewServeMux()
 	mux.Handle("GET /edge/metrics", promhttp.HandlerFor(ed.Registry, promhttp.HandlerOpts{}))

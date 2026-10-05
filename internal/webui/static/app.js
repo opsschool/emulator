@@ -1,5 +1,7 @@
 // The session page: polls the daemon's /status, runs terminals over
 // /api/terminal, draws /api/charts, and calls /hint, /verify and /stop.
+// Every URL is relative: the hosted portal serves the page under
+// /s/<session>/ and passes those calls on to the session.
 import { Terminal } from "./vendor/xterm.mjs";
 import { FitAddon } from "./vendor/addon-fit.mjs";
 
@@ -11,6 +13,8 @@ let statusAt = 0; // when it arrived, to run the clock between polls
 let ended = false;
 let view = "terminal";
 let hintConfirming = false;
+let hosted = false; // served by the hosted portal
+let ready = false; // the session has answered once
 
 // ---- Formatting ----
 
@@ -44,15 +48,47 @@ $("theme").addEventListener("click", () => {
 async function poll() {
   if (ended) return;
   try {
-    const r = await fetch("/status");
+    const r = await fetch("status");
+    // While a hosted session starts, it answers with how setup is going.
+    if (r.status === 503 && (r.headers.get("content-type") || "").includes("json")) {
+      hosted = true;
+      showStarting(await r.json());
+      return;
+    }
     if (!r.ok) throw new Error(await r.text());
     status = await r.json();
     statusAt = Date.now();
     $("banner").hidden = true;
+    $("starting").hidden = true;
     render();
+    if (!ready) {
+      ready = true;
+      // The terminal measures its font, so wait for it.
+      document.fonts.load('14px "Atkinson Hyperlegible Mono"').finally(() => newShell());
+    }
   } catch (e) {
-    showBanner("Can't reach the session. If it has ended you can close this tab; otherwise check that `opsschool start` finished without errors.");
+    showBanner(hosted
+      ? "Can't reach the session. If it has ended, you can go back to the scenarios."
+      : "Can't reach the session. If it has ended you can close this tab; otherwise check that `opsschool start` finished without errors.");
   }
+}
+
+function showStarting(s) {
+  showHome("/");
+  $("waiting").hidden = true;
+  $("paged").hidden = true;
+  $("starting").hidden = false;
+  $("starting-msg").textContent = s.error || s.message || "";
+  $("starting-msg").classList.toggle("bad", !!s.error);
+  $("starting-bar").hidden = !!s.error;
+  $("starting-help").hidden = !!s.error;
+  $("clock").textContent = s.error ? "" : "Setting up…";
+  if (s.error) ended = true;
+}
+
+function showHome(url) {
+  $("home").href = url;
+  $("home").hidden = false;
 }
 
 function showBanner(text) {
@@ -99,6 +135,10 @@ function render() {
   document.title = `${page.id} · Ops School`;
   $("scenario-id").textContent = page.id;
   $("grafana").href = page.grafana_url;
+  if (page.home_url) {
+    hosted = true;
+    showHome(page.home_url);
+  }
 
   $("waiting").hidden = isBegun;
   $("paged").hidden = !isBegun;
@@ -202,14 +242,14 @@ async function post(path) {
 }
 
 $("docs-show").addEventListener("click", async () => {
-  try { await post("/hint"); } catch (e) { showBanner(e.message); }
+  try { await post("hint"); } catch (e) { showBanner(e.message); }
   poll();
 });
 $("hint-show").addEventListener("click", () => { hintConfirming = true; render(); $("hint-confirm").focus(); });
 $("hint-cancel").addEventListener("click", () => { hintConfirming = false; render(); });
 $("hint-confirm").addEventListener("click", async () => {
   hintConfirming = false;
-  try { await post("/hint"); } catch (e) { showBanner(e.message); }
+  try { await post("hint"); } catch (e) { showBanner(e.message); }
   poll();
 });
 
@@ -234,7 +274,7 @@ $("verify").addEventListener("click", async () => {
     log.scrollTop = log.scrollHeight;
   };
   try {
-    const r = await fetch("/verify", { method: "POST" });
+    const r = await fetch("verify", { method: "POST" });
     if (!r.ok) throw new Error((await r.text()).trim());
     const reader = r.body.pipeThrough(new TextDecoderStream()).getReader();
     let buf = "";
@@ -300,7 +340,7 @@ $("end-confirm").addEventListener("click", async () => {
   $("end-confirm").disabled = true;
   let res;
   try {
-    res = await post("/stop?teardown=1");
+    res = await post("stop?teardown=1");
   } catch (e) {
     $("end-confirm").disabled = false;
     showBanner(`Couldn't end the session: ${e.message}`);
@@ -327,6 +367,8 @@ $("end-confirm").addEventListener("click", async () => {
   $("end-ask").hidden = true;
   $("end-done").hidden = false;
   for (const id of ["verify", "end", "docs-show", "hint-show"]) $(id).disabled = true;
+  $("end-gone").hidden = hosted;
+  $("end-home").hidden = !hosted;
   showBanner("This session has ended.");
 });
 
@@ -440,8 +482,9 @@ function newShell() {
 function connect(sh) {
   sh.state = "connecting";
   updateState();
-  const proto = location.protocol === "https:" ? "wss" : "ws";
-  const ws = new WebSocket(`${proto}://${location.host}/api/terminal`);
+  const url = new URL("api/terminal", location.href);
+  url.protocol = location.protocol === "https:" ? "wss:" : "ws:";
+  const ws = new WebSocket(url);
   ws.binaryType = "arraybuffer";
   sh.ws = ws;
   ws.onopen = () => {
@@ -591,7 +634,7 @@ function svgEl(tag, attrs) {
 
 async function loadCharts() {
   try {
-    const r = await fetch("/api/charts?minutes=15");
+    const r = await fetch("api/charts?minutes=15");
     if (!r.ok) throw new Error(await r.text());
     drawCharts((await r.json()).charts);
   } catch (e) {
@@ -701,8 +744,7 @@ setInterval(() => { if (view === "dashboard" && !ended) loadCharts(); }, 15000);
 
 // ---- Start ----
 
+// The first terminal opens once the session answers; see poll.
 poll();
 setInterval(poll, 2000);
 setInterval(tickClock, 1000);
-// The terminal measures its font, so wait for it.
-document.fonts.load('14px "Atkinson Hyperlegible Mono"').finally(() => newShell());
