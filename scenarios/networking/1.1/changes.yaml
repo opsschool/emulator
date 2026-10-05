@@ -1,0 +1,18 @@
+- id: NET-412
+  title: "Site DNS: move to the new resolver"
+  author: netconfig
+  team: Network team
+  before: 12m
+  status: Pushed (revision 2291); services restarted
+  description: |
+    Moves hosts to the new site resolver ahead of decommissioning the old
+    one. The push restarts services that hold network connections.
+  diff: |
+    --- a/hosts/scenario-vm/resolved.conf.d/site-dns.conf
+    +++ b/hosts/scenario-vm/resolved.conf.d/site-dns.conf
+    @@ -1,4 +1,4 @@
+     # Site DNS, rolled out by netconfig (NET-412).
+     [Resolve]
+    -DNS=10.53.0.10
+    +DNS=${dead_resolver}
+     Domains=~shop.internal

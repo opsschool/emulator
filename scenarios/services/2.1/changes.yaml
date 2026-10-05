@@ -1,0 +1,10 @@
+- id: SEC-318
+  title: Renew the api.shop.internal certificate
+  author: jordan
+  team: Security
+  before: 2h
+  status: Done; nginx reloaded
+  description: |
+    The automatic renewal job failed last week, so I renewed the API
+    certificate by hand and installed it. Checked the site in my browser
+    afterwards: padlock is fine and the new expiry date shows.

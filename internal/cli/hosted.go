@@ -35,18 +35,47 @@ func runServe(e *Env, args []string) error {
 	maxAge := fs.Duration("max-age", 3*time.Hour, "delete sessions older than this")
 	ns := fs.String("namespace", env("OPSSCHOOL_NAMESPACE", ""), "namespace for session pods (default: the portal's)")
 	image := fs.String("image", env("OPSSCHOOL_IMAGE", ""), "the opsschool image, for session runners")
-	machineImage := fs.String("machine-image", "opsschool/{image}:base", `scenario machine image; "{image}" becomes the scenario's image name`)
+	machines := fs.String("machines", "kubevirt", "how to run scenario machines: kubevirt (a VM each; needs KubeVirt and KVM nodes), ec2 (an EC2 instance each) or pods (privileged pods; some scenarios can't run)")
+	machineImage := fs.String("machine-image", "", `scenario machine image; "{image}" becomes the scenario's image name (default: opsschool/{image}-vm:base for kubevirt, opsschool/{image}:base for pods, the newest AMI built for the image for ec2)`)
+	ec2Subnet := fs.String("ec2-subnet", "", "subnet for machine instances (ec2 only)")
+	ec2Groups := fs.String("ec2-security-groups", "", "comma-separated security groups for machine instances (ec2 only)")
+	ec2Type := fs.String("ec2-instance-type", vm.EC2InstanceType, "instance type for machines (ec2 only)")
 	portalURL := fs.String("portal-url", "", "the portal's address inside the cluster, for results (default: http://opsschool.<namespace>.svc:8080)")
 	sa := fs.String("session-service-account", "opsschool-session", "service account for session pods")
-	runtimeClass := fs.String("runtime-class", "", "runtime class for machine pods, such as kata")
-	cpu := fs.String("machine-cpu", "1", "CPU request for each machine pod")
-	mem := fs.String("machine-memory", "2Gi", "memory request for each machine pod")
-	memLimit := fs.String("machine-memory-limit", "", "memory limit for each machine pod (default: none)")
+	runtimeClass := fs.String("runtime-class", "", "runtime class for machine pods, such as kata (pods only)")
+	cpu := fs.String("machine-cpu", "1", "CPU request for each machine")
+	mem := fs.String("machine-memory", "2Gi", "memory request for each machine pod (pods only; VMs get "+vm.VMMemory+")")
+	memLimit := fs.String("machine-memory-limit", "", "memory limit for each machine pod (pods only; default: none)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if fs.NArg() != 0 {
 		return errUsage
+	}
+	var driver string
+	machineEnv := map[string]string{}
+	switch *machines {
+	case "kubevirt":
+		driver = "kubevirt"
+		if *machineImage == "" {
+			*machineImage = vm.VMDiskImage("{image}")
+		}
+	case "pods":
+		driver = "kubernetes"
+		if *machineImage == "" {
+			*machineImage = vm.BaseImage("{image}")
+		}
+	case "ec2":
+		driver = "ec2"
+		if *ec2Subnet == "" || *ec2Groups == "" {
+			return errors.New("--machines=ec2 needs --ec2-subnet and --ec2-security-groups")
+		}
+		machineEnv["OPSSCHOOL_EC2_SUBNET"] = *ec2Subnet
+		machineEnv["OPSSCHOOL_EC2_SECURITY_GROUPS"] = *ec2Groups
+		machineEnv["OPSSCHOOL_EC2_INSTANCE_TYPE"] = *ec2Type
+		machineEnv["OPSSCHOOL_MAX_AGE"] = maxAge.String()
+	default:
+		return fmt.Errorf("--machines is kubevirt, ec2 or pods, not %q", *machines)
 	}
 	if *image == "" {
 		return errors.New("pass --image (or set OPSSCHOOL_IMAGE) to the opsschool image the portal runs")
@@ -75,7 +104,7 @@ func runServe(e *Env, args []string) error {
 			fmt.Fprintf(e.Stderr, "skipping %s: it doesn't validate\n", s.Spec.ID)
 			continue
 		}
-		if s.Spec.NeedsVM != "" {
+		if s.Spec.NeedsVM != "" && driver == "kubernetes" {
 			fmt.Fprintf(e.Stderr, "skipping %s: it only runs on a VM: %s\n", s.Spec.ID, s.Spec.NeedsVM)
 			continue
 		}
@@ -90,8 +119,8 @@ func runServe(e *Env, args []string) error {
 		MaxSessions: *maxSessions, MaxAge: *maxAge, Log: lg,
 		Backend: &hosted.Kube{
 			Namespace: *ns, Image: *image, MachineImage: *machineImage, PortalURL: *portalURL,
-			ServiceAccount: *sa, RuntimeClass: *runtimeClass,
-			MachineCPU: *cpu, MachineMemory: *mem, MachineMemoryLimit: *memLimit,
+			ServiceAccount: *sa, MachineDriver: driver, RuntimeClass: *runtimeClass,
+			MachineCPU: *cpu, MachineMemory: *mem, MachineMemoryLimit: *memLimit, MachineEnv: machineEnv,
 		},
 	}
 	ctx, cancel := signalContext()
@@ -104,7 +133,7 @@ func runServe(e *Env, args []string) error {
 		defer c()
 		srv.Shutdown(sctx)
 	}()
-	lg.Printf("serving %d scenarios on %s (sessions in namespace %s)", len(valid), *listen, *ns)
+	lg.Printf("serving %d scenarios on %s (sessions in namespace %s, machines: %s)", len(valid), *listen, *ns, *machines)
 	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
@@ -127,9 +156,13 @@ func runRunner(e *Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	m, err := vm.KubeFromEnv()
+	d, err := vm.New(firstNonEmpty(e.Getenv("OPSSCHOOL_MACHINE_DRIVER"), "kubernetes"))
 	if err != nil {
 		return err
+	}
+	m, ok := d.(vm.Hosted)
+	if !ok {
+		return fmt.Errorf("the %s driver can't run hosted sessions", d.Name())
 	}
 	r := &hosted.Runner{
 		Scenario: s, User: e.Getenv("OPSSCHOOL_USER"), Seed: session.NewSeed(), Home: home, Machine: m,

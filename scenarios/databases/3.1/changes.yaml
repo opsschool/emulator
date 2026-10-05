@@ -1,0 +1,18 @@
+- id: DB-212
+  title: Move MySQL's temporary files to the data volume
+  author: ines
+  team: Database team
+  before: 10m
+  status: Applied; MySQL restarted
+  description: |
+    Large sorts filled the root disk during last quarter's reporting run.
+    Created ${tmpdir} (mysql:mysql, mode 0750) on /data and pointed
+    tmpdir at it. Permissions checked twice.
+  diff: |
+    --- /dev/null
+    +++ b/etc/mysql/mysql.conf.d/zz-tuning.cnf
+    @@ -0,0 +1,4 @@
+    +# DB-212: keep MySQL's temporary files off the root disk. Large sorts filled
+    +# it during last quarter's reporting run.
+    +[mysqld]
+    +tmpdir = ${tmpdir}

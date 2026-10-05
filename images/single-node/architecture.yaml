@@ -1,0 +1,147 @@
+# What the learner's Architecture tab shows for this image: the parts of
+# the shop, where each one runs, and how they connect. It describes the
+# healthy system, the same for every scenario, so it never points at a
+# fault. It isn't part of the built image (vm.Fingerprint skips it).
+#
+# Zones are drawn top to bottom, in this order. A component's `calls` lists
+# the components it sends requests to, by id.
+zones:
+  - id: outside
+    name: Customers
+    about: Browsers, the mobile app and partner integrations, all over the internet.
+    components:
+      - id: customers
+        name: Customers
+        about: People browsing the catalog and placing orders, plus API clients such as the mobile app.
+        calls: [edge]
+
+  - id: edge
+    name: Edge
+    about: Runs in front of the server. You can't log in to it, but its logs and metrics are on the dashboard.
+    components:
+      - id: edge
+        name: Load balancer
+        about: >
+          Takes every customer request and forwards it to the server on port 80.
+          It answers 502 when the server refuses or drops the connection, and
+          504 when the server takes too long.
+        where: In front of the server; not on scenario-vm
+        observe:
+          - "Dashboard: the edge panels"
+          - 'Grafana Explore, Loki: {job="edge"}'
+        calls: [nginx]
+
+  - id: server
+    name: scenario-vm
+    about: >
+      The shop's one server, an Ubuntu 26.04 machine. Your terminal is a root
+      shell here. Everything below runs on it as a systemd service.
+    components:
+      - id: nginx
+        name: nginx
+        about: Web server in front of the shop. Passes every request to the shop API, and terminates TLS for the internal API names.
+        unit: nginx.service
+        listens: [":80 (HTTP, from the load balancer)", ":443 (TLS for api.shop.internal and partners.shop.internal)"]
+        config: [/etc/nginx/sites-available/shop, /etc/nginx/sites-available/shop-tls, /etc/nginx/tls/]
+        logs: [/var/log/nginx/shop.access.log, /var/log/nginx/error.log]
+        calls: [shop]
+      - id: shop
+        name: Shop API
+        about: The shop itself, written in Go. Serves the catalog, carts, checkout and order history.
+        unit: shop.service
+        listens: ["127.0.0.1:8080 (HTTP, from nginx)", ":9091 (admin: /metrics, /debug/pprof)"]
+        config: [/etc/shop/shop.env]
+        logs: [/data/log/shop/app.log, "journalctl -u shop"]
+        files: ["/opt/shop/current (a symlink to the running release in /opt/shop/releases)"]
+        calls: [mysql, redis, payments, dns]
+      - id: worker
+        name: Order worker
+        about: Processes queued orders in the background, after checkout has accepted them.
+        unit: shop-worker.service
+        listens: [":9092 (admin: /metrics)"]
+        config: [/etc/shop/shop.env]
+        logs: [/data/log/shop/app.log, "journalctl -u shop-worker"]
+        calls: [mysql, redis]
+      - id: maintenance
+        name: Maintenance job
+        about: Builds reports and cleans up old sessions. Runs from cron at 17 minutes past every hour.
+        unit: cron.service
+        config: [/etc/cron.d/shop-maintenance, /etc/shop/shop.env]
+        logs: ["journalctl -u cron"]
+        calls: [mysql]
+      - id: thumbs
+        name: Thumbnail service
+        about: Makes catalog thumbnails from product photos that staff upload. A vendor product, installed under /opt/shop-thumbs.
+        unit: shop-thumbs.service
+        files: [/data/uploads/queue, /data/uploads/thumbs]
+        logs: ["journalctl -u shop-thumbs"]
+      - id: mysql
+        name: MySQL 8.4
+        about: 'The shop''s database, named "shop". It holds products, customers and orders.'
+        unit: mysql.service
+        listens: ["3306 (local only; the firewall drops it from outside)", "/run/mysqld/mysqld.sock"]
+        config: [/etc/mysql/mysql.conf.d/]
+        files: ["/data/mysql (data directory)"]
+        logs: [/var/log/mysql/error.log, "/data/mysql/slow.log (queries slower than 0.5 s)"]
+      - id: redis
+        name: Redis
+        about: Cache for catalog pages, checkout locks and customers' wishlists.
+        unit: redis-server.service
+        listens: ["127.0.0.1:6379 (local only)"]
+        config: [/etc/redis/redis.conf]
+        files: ["/var/lib/redis (snapshots)"]
+        logs: [/var/log/redis/redis-server.log]
+      - id: dns
+        name: Site DNS
+        about: >
+          Names under shop.internal, such as payments.shop.internal. systemd-resolved
+          answers the machine's lookups and sends shop.internal names to dnsmasq,
+          the site resolver.
+        unit: "systemd-resolved.service, dnsmasq.service"
+        listens: ["127.0.0.53 (systemd-resolved)", "10.53.0.10 on svc0 (dnsmasq)"]
+        config: [/etc/systemd/resolved.conf.d/, /etc/dnsmasq.d/site.conf]
+        observe: ["resolvectl status"]
+      - id: data
+        name: Data volume
+        about: A separate file system for the shop's data, logs and uploads, mounted at /data.
+        files: ["/data (backed by /var/lib/data.img)", /etc/fstab]
+      - id: firewall
+        name: Firewall
+        about: iptables rules that keep MySQL and Redis local. Loaded at boot.
+        unit: netfilter-persistent.service
+        config: [/etc/iptables/rules.v4]
+        observe: ["iptables -S"]
+      - id: agents
+        name: Monitoring agents
+        about: Exporters for the dashboard's metrics, and Alloy, which ships the journal and the shop's logs to Loki.
+        unit: "node_exporter, process-exporter, mysqld_exporter, redis_exporter, alloy"
+        listens: [":9100, :9256, :9104, :9121 (metrics)"]
+        calls: [monitoring]
+
+  - id: services
+    name: Service network
+    about: >
+      Other teams' services on the internal service segment (bridge br-svc,
+      10.54.0.0/24). In this lab the payments host runs on scenario-vm too,
+      in its own network namespace.
+    components:
+      - id: payments
+        name: Payments gateway
+        about: >
+          The payments team's service. The shop calls it at
+          http://payments.shop.internal:8081 to authorize every order.
+          It's a sandbox that stands in for the card network.
+        where: "10.54.0.20, network namespace pay1 (ip netns exec pay1 ...)"
+        unit: shop-payments.service
+        listens: ["10.54.0.20:8081 (HTTP)"]
+        logs: ["journalctl -u shop-payments"]
+
+  - id: monitoring
+    name: Monitoring
+    about: Runs next to your session, not on scenario-vm. The Dashboard tab and Grafana read from it.
+    components:
+      - id: monitoring
+        name: Prometheus, Loki and Grafana
+        about: Prometheus scrapes the exporters and the shop's /metrics every few seconds; Loki stores the logs Alloy sends.
+        where: Beside your session; not on scenario-vm
+        observe: ["The Dashboard tab", "Grafana (link on the Dashboard tab)"]

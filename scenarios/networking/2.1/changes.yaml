@@ -1,0 +1,18 @@
+- id: SEC-2291
+  title: "Firewall hardening: the app port only takes traffic from the proxy"
+  author: jordan
+  team: Security
+  before: 6m
+  status: Applied and saved
+  description: |
+    Nothing but the proxy should talk to the shop's app port directly.
+    Applied live and saved to the persisted rules.
+  diff: |
+    --- a/etc/iptables/rules.v4
+    +++ b/etc/iptables/rules.v4
+    @@ -6,4 +6,5 @@
+     # MySQL and Redis are local-only.
+     -A INPUT ! -i lo -p tcp -m tcp --dport 3306 -j DROP
+     -A INPUT ! -i lo -p tcp -m tcp --dport 6379 -j DROP
+    +-A INPUT -p tcp -m tcp --dport 8080 -m comment --comment "app port: proxy only (SEC-2291)" -j ${action}
+     COMMIT

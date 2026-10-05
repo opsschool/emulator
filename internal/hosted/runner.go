@@ -35,7 +35,7 @@ type Runner struct {
 	User     string
 	Seed     uint64
 	Home     string // session state directory
-	Machine  *vm.Kube
+	Machine  vm.Hosted
 	// Token admits the portal's requests; see session.Hosted.
 	Token string
 	// PortalURL is where results are sent.
@@ -88,7 +88,7 @@ func (r *Runner) Run(ctx context.Context) error {
 	if err := env.Bring(ctx, s); err != nil {
 		return fail(err)
 	}
-	ip, err := r.Machine.PodIP(ctx)
+	ip, err := r.Machine.Address(ctx)
 	if err != nil {
 		return fail(err)
 	}

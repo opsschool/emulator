@@ -45,6 +45,8 @@
       <div class="seg" role="tablist" aria-label="Workspace">
         <button role="tab" id="tab-terminal" aria-selected="true" aria-controls="terminal-view">Terminal</button>
         <button role="tab" id="tab-dashboard" aria-selected="false" aria-controls="dashboard-view">Dashboard</button>
+        <button role="tab" id="tab-changes" aria-selected="false" aria-controls="changes-view">Recent changes</button>
+        <button role="tab" id="tab-architecture" aria-selected="false" aria-controls="architecture-view">Architecture</button>
       </div>
       <ul class="tips" id="term-tips" aria-label="Terminal tips">
         <li>Select text to copy it, middle-click to paste</li>
@@ -69,6 +71,31 @@
       <a class="grafana" id="grafana" target="_blank" rel="noopener">Open the full dashboard in Grafana
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>
       </a>
+    </section>
+
+    <section class="dash" id="changes-view" role="tabpanel" aria-labelledby="tab-changes" hidden>
+      <div class="view-intro">
+        <h2>Recent changes</h2>
+        <p class="muted">Pull requests, deploys and change tickets from the teams that run the shop, newest first.
+          Most changes are harmless; it's worth knowing what changed and when.</p>
+      </div>
+      <p class="muted" id="changes-empty" hidden>No changes yet.</p>
+      <ol class="changes" id="changes"></ol>
+    </section>
+
+    <section class="dash" id="architecture-view" role="tabpanel" aria-labelledby="tab-architecture" hidden>
+      <div class="view-intro">
+        <h2>How the shop is put together</h2>
+        <p class="muted">Each box is one part of the system, grouped by where it runs. Select one to see where it
+          listens, where its configuration and logs are, and what it talks to.</p>
+        <p class="path" id="arch-path"></p>
+      </div>
+      <div class="arch">
+        <div class="zones" id="zones"></div>
+        <div class="arch-detail" id="arch-detail" aria-live="polite">
+          <p class="muted">Select a component.</p>
+        </div>
+      </div>
     </section>
   </div>
 

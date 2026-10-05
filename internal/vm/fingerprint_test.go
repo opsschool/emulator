@@ -34,6 +34,9 @@ func TestFingerprint(t *testing.T) {
 	write("demoapp/testdata/orders.json", "[]")
 	write("images/other/provision.sh", "echo")
 	write("scenarios/linux/1.1/break.sh", "echo")
+	// Nor does what the learner is told about it.
+	write("images/single-node/architecture.yaml", "zones: []")
+	write("images/single-node/changes.yaml", "[]")
 	if fp() != base {
 		t.Error("files outside the image changed the fingerprint")
 	}

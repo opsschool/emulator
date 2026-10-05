@@ -23,6 +23,10 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/component: machine
+        # With --machines=ec2 the machines are instances, not pods: allow
+        # their subnet instead.
+        # - ipBlock:
+        #     cidr: 10.0.64.0/20
       ports:
         - port: 13100
 ---

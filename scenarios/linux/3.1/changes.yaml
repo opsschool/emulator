@@ -1,0 +1,10 @@
+- id: INFRA-88
+  title: Integrity check of the /data volume
+  author: noor
+  team: Infrastructure
+  before: 9h
+  status: Done
+  description: |
+    Took /data offline for a full fsck after last week's storage errors on
+    the host. Stopped the services that use it, unmounted, ran
+    e2fsck -f (no errors), mounted it again and started everything.
