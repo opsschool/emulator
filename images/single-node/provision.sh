@@ -30,7 +30,7 @@ install_packages() {
     ca-certificates curl gnupg unzip jq openssl \
     nginx redis-server cron logrotate iptables-persistent \
     strace lsof sysstat tcpdump bind9-dnsutils iproute2 iptables htop procps psmisc \
-    net-tools ncat less vim-tiny python3 iputils-arping conntrack
+    net-tools ncat less vim-tiny python3 iputils-arping conntrack git
   # Tracing tools vary by distribution; install what exists.
   for pkg in bpftrace linux-tools-generic; do
     apt-get install -y -q --no-install-recommends "$pkg" || echo "skipping $pkg"
